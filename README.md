@@ -8,7 +8,9 @@
 
 ## 使用方法
 
-### 安装
+### 安装依赖
+
+lein依赖中添加：`[org.to.vitory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
 ### 在sql文件中的使用
 
