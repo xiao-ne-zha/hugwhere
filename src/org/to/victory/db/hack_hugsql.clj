@@ -1,11 +1,11 @@
-(ns org.to.vitory.db.hack-hugsql
+(ns org.to.victory.db.hack-hugsql
   (:require [robert.hooke :refer [add-hook]]
             [clojure.string :as str]
             [hugsql.parser :as hp]))
 
 (defn- hack-pdef [{sql :sql {req :require nm :name} :hdr :as pdef}]
   (let [dynamic-where (= ":D" (last nm))
-        req (if dynamic-where (conj req "[org.to.vitory.db.hugwhere :refer [where]]") req)
+        req (if dynamic-where (conj req "[org.to.victory.db.hugwhere :refer [where]]") req)
         sql (if dynamic-where
               (mapv #(if (vector? %)
                        (let [[s e] %]

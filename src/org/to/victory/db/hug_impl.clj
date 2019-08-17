@@ -1,4 +1,4 @@
-(ns org.to.vitory.db.hug-impl
+(ns org.to.victory.db.hug-impl
   (:require  [clojure.string :as str]
              [instaparse.core :refer [defparser]]
              [clojure.java.io :as io]))

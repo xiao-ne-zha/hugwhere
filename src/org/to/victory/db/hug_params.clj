@@ -1,4 +1,4 @@
-(ns org.to.vitory.db.hug-params
+(ns org.to.victory.db.hug-params
   (:require  [clojure.string :as str]
              [hugsql.parameters :as hp :refer [apply-hugsql-param]]))
 

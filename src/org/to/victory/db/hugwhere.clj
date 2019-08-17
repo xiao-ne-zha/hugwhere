@@ -1,5 +1,5 @@
-(ns org.to.vitory.db.hugwhere
-  (:require [org.to.vitory.db.hug-impl :refer [where-parser to-sql]]
+(ns org.to.victory.db.hugwhere
+  (:require [org.to.victory.db.hug-impl :refer [where-parser to-sql]]
             [clojure.string :as str]))
 
 (defn where [params where-clause]
