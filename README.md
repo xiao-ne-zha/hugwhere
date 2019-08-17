@@ -18,13 +18,14 @@ lein依赖中添加：`[org.to.vitory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
 ### 在sql文件中的使用
 按hugsql约定，在resouces/xxx.sql里面写明你的函数，下面是几个例子
+注意在 :name 行的最后增加 :D 是打开动态where的开关
 
 #### 定义一个一般动态sql函数
 
-    -- :name list-users :? :*
+    -- :name list-users :? :* :D
     -- :doc 固定条件默认保留，动态条件根据参数是否为nil保留
     select * from users
-    --~ (where params "id = :id and name like :l:name and is_valid = 1")
+    --~ where id = :id and name like :l:name and is_valid = 1
 
     以上函数，调用时实际执行的sql如下：
     (list-users conn {}) => select * from users where is_valid = 1
@@ -34,10 +35,10 @@ lein依赖中添加：`[org.to.vitory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
 #### 定义一个随动态参数保留的固定条件
 
-    -- :name list-users2
+    -- :name list-users2 :? :* :D
     -- :doc 固定条件随参数动态去留
     select * from users
-    --~ (where params "id = :id and [name like :l:name and is_valid = 1]")
+    --~ where id = :id and [name like :l:name and is_valid = 1]
 
     以上函数，调用时实际执行的sql如下：
     (list-users2 conn {}) => select * from users
