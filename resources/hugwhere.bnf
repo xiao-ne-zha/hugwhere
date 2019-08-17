@@ -1,11 +1,10 @@
 where-clause = WHERE conds
 conds = cond (LO cond)*
-cond = atom-cond | comp-cond | sensitive-conds
+cond = atom-cond | OP conds CP | sensitive-conds
 atom-cond = compare-expr 
-compare-expr = le CO re
-comp-cond = OP conds CP
+<compare-expr> = le CO re
 sensitive-conds = OB conds CB
-le = FIELD
+<le> = FIELD
 re = FIELD | STR | KID
 <OP> = '('
 <CP> = ')'
@@ -14,7 +13,7 @@ re = FIELD | STR | KID
 <NOT> = 'not'
 <WHERE> = 'where'
 <FIELD> = #"([-\w]+\.)*[-\w]+"
-KID = #"(:[-\w]+\*?)?:[^\s(:)]+"
+KID = #"(:[-\w]+\*?)?:[^\s(:)\[\]]+"
 <LO> = 'and' | 'or'
 <CO> = '=' | '>=' | '<=' | '!=' | '<>' | 'like' | 'is' | 'is' NOT? | NOT? 'in' | '>' | '<'
 <STR> = #"'.+?'"

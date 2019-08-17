@@ -5,5 +5,6 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [com.layerware/hugsql "0.4.9"]
-                 [instaparse "1.4.9"]]
+                 [instaparse "1.4.9"]
+                 [robert/hooke "1.3.0"]]
   :repl-options {:init-ns org.to.vitory.db.hugwhere})

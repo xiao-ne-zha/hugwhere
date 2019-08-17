@@ -1,6 +1,6 @@
-(ns org.to.vitory.db.hugwhere)
+(ns org.to.vitory.db.hugwhere
+  (:require [org.to.vitory.db.hug-impl :refer [where-parser to-sql]]
+            [clojure.string :as str]))
 
-(defn foo
-  "I don't do a whole lot."
-  [x]
-  (println x "Hello, World!"))
+(defn where [params where-clause]
+  (to-sql params nil (where-parser (str "where " where-clause))))
