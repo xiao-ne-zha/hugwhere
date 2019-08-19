@@ -57,6 +57,10 @@ Here are a few exampls:
     (list-users2 conn {:id 1} => select * from users where id = 1
     (list-users2 conn {:id 1, :name "nezha"}) => select * from users where id = 1 and name like '%nezha%' and is_valid = 1
 
+## Examples
+
+[hello-hugwhere](https://github.com/xiao-ne-zha/hugwhere/tree/master/examples/hello-hugwhere)
+
 ## License
 
 Copyright © 2019 xiao-ne-zha
