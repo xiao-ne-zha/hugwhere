@@ -14,7 +14,15 @@
 
 ### 安装依赖
 
-lein依赖中添加：`[org.to.vitory.db/hugwhere "0.1.0-SNAPSHOT"]`
+lein依赖中添加：`[org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"]`
+
+### 在代码中初始化hugwhere
+
+在你的系统第一次访问数据库前，调用下面的代码（或者一个较好的实践是系统初始化阶段调用）
+
+    (require '[org.to.victory.db.hack-hugsql :refer hh])
+    (hh/hack-hugsql)
+
 
 ### 在sql文件中的使用
 按hugsql约定，在resouces/xxx.sql里面写明你的函数，下面是几个例子

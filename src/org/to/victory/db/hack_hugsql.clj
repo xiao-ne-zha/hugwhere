@@ -17,10 +17,11 @@
               sql)]
     (assoc (assoc-in pdef [:hdr :require] req) :sql sql)))
 
-(defn parse-hook
+(defn- parse-hook
   ([f sql] (parse-hook f sql {}))
   ([f sql opts]
    (let [pdefs (f sql opts)]
      (mapv hack-pdef pdefs))))
 
-(add-hook #'hp/parse #'parse-hook)
+(defn hack-hugsql []
+  (add-hook #'hp/parse #'parse-hook))
