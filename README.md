@@ -1,54 +1,57 @@
 # hugwhere
+中文说明请参看 README.cn.md
 
-该工具主要是方便配置hugsql的动态where语句。主要功能有
-  * 1.根据参数中非nil值，动态拼接where语句，丢弃其中nil值参数相关的sql片段。如`where a = :a or b like :b` 在参数:b为nil时，输出`where a = :a`
-  * 2.默认保留无变参部分的sql片段。如`where a=1 and b = :b` 在参数:b为nil时，输出结果为`where a=1`
-  * 3.可以强制随变参存在或消失的sql片段。如`where [a=1 and b = :b]` 在参数:b为nil时，输出结果为nil
-  * 4.支持where中使用函数、子查询（暂未实现)
-  * 5.增加了三种用于like的值语法，感谢hugsql的设计，当你依赖了本库就可以直接在sql文件中使用着三种语法。这三种分别是
-    * 5.1 中间像: `:like:value` 或 简写 `:l:value`, 会将传入的`value`转变为 `%value%` 形式
-    * 5.2 左边像: `:left-like:value` 或简写 `:ll:value`, 会将传入的`value`转变为 `value%` 形式
-    * 5.3 右边像: `:right-like:value` 或简写 `:rl:value`, 会将传入的`value`转变为 `%value` 形式
+This tool is mainly to facilitate the configuration of the dynamic where statement of hugsql. The main functions are
+  * 1.According to the non-nil value in the parameter, dynamically splicing the where statement, discarding the sql fragment related to the nil value parameter. For example, `where a = :a or b like :b` when the parameter `:b` is nil, the output `where a = :a`
+  * 2.By default, the sql fragment without the variable part is retained. For example, `where a=1 and b = :b` when the parameter `:b` is nil, the output iswhere a=1 `where a=1`
+  * 3. It is possible to force the sql fragment to exist or disappear with the variable parameter. For example, `where [a=1 and b = :b]` when the parameter `:b` is nil, the output is nil. 
+  * 4.Support the use of functions, subqueries (not yet implemented)
+  * 5.Added three value syntax for like, thanks to the design of hugsql, you can use three syntax directly in the sql file when you rely on this library. These three are
+    * 5.1 middle like or normal like: `:like:value` or short `:l:value`, will transform `value` to `%value%`
+    * 5.2 left like: `:left-like:value` or short `:ll:value`, will transform `value` to `value%`
+    * 5.3 right like: `:right-like:value` or short `:rl:value`, will transform `value` to `%value`
 
-## 使用方法
+## Usage
 
-### 安装依赖
+### Installation dependency
 
-lein依赖中添加：`[org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"]`
+Added in lein dependency:`[org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
-### 在代码中初始化hugwhere
+### Initialize hugwhere in the code
+Call the following code before your system first accesses the database (or a good practice is to call the system initialization phase)
 
-在你的系统第一次访问数据库前，调用下面的代码（或者一个较好的实践是系统初始化阶段调用）
 
     (require '[org.to.victory.db.hack-hugsql :refer hh])
     (hh/hack-hugsql)
 
 
-### 在sql文件中的使用
-按hugsql约定，在resouces/xxx.sql里面写明你的函数，下面是几个例子
-注意在 :name 行的最后增加 :D 是打开动态where的开关
+### Use in sql file
+According to the hugsql convention, write your function in rechouces/xxx.sql.
+  * Note: the `:D` is the key of hugwhere
 
-#### 定义一个一般动态sql函数
+Here are a few exampls:
+
+#### Define a general dynamic sql function
 
     -- :name list-users :? :* :D
-    -- :doc 固定条件默认保留，动态条件根据参数是否为nil保留
+    -- :doc keep the constant condition in the sql 
     select * from users
     --~ where id = :id and name like :l:name and is_valid = 1
 
-    以上函数，调用时实际执行的sql如下：
+    the action will be：
     (list-users conn {}) => select * from users where is_valid = 1
     (list-users conn {:id 1}) => select * from users where id = 1 and is_valid = 1
     (list-users conn {:name "nezha"}) => select * from users where name like '%nezha%' and is_valid = 1
     (list-users conn {:id 1, :name "nezha"}) => select * from users where id = 1 and name like '%nezha%' and is_valid = 1
 
-#### 定义一个随动态参数保留的固定条件
+#### Define a constant condition that is retained with dynamic parameters
 
     -- :name list-users2 :? :* :D
-    -- :doc 固定条件随参数动态去留
+    -- :doc constant condition will keep or not with there friend condition
     select * from users
     --~ where id = :id and [name like :l:name and is_valid = 1]
 
-    以上函数，调用时实际执行的sql如下：
+    the action will be:
     (list-users2 conn {}) => select * from users
     (list-users2 conn {:name "nezha"} => select * from users where name like '%nezha%' and is_valid = 1
     (list-users2 conn {:id 1} => select * from users where id = 1
