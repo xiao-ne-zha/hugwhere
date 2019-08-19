@@ -1,7 +1,8 @@
 (ns org.to.victory.db.hack-hugsql
   (:require [robert.hooke :refer [add-hook]]
             [clojure.string :as str]
-            [hugsql.parser :as hp]))
+            [hugsql.parser :as hp]
+            [org.to.victory.db.hug-params]))
 
 (defn- hack-pdef [{sql :sql {req :require nm :name} :hdr :as pdef}]
   (let [dynamic-where (= ":D" (last nm))

@@ -20,7 +20,7 @@ lein依赖中添加：`[org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
 在你的系统第一次访问数据库前，调用下面的代码（或者一个较好的实践是系统初始化阶段调用）
 
-    (require '[org.to.victory.db.hack-hugsql :refer hh])
+    (require '[org.to.victory.db.hack-hugsql :as hh])
     (hh/hack-hugsql)
 
 
