@@ -1,5 +1,5 @@
 # hugwhere
-中文说明请参看 README.cn.md
+中文说明请参看 [README.cn](https://github.com/xiao-ne-zha/hugwhere/blob/master/README.cn.md)
 
 This tool is mainly to facilitate the configuration of the dynamic where statement of hugsql. The main functions are
   * 1.According to the non-nil value in the parameter, dynamically splicing the where statement, discarding the sql fragment related to the nil value parameter. For example, `where a = :a or b like :b` when the parameter `:b` is nil, the output `where a = :a`
