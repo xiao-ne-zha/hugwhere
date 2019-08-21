@@ -55,10 +55,7 @@
   (case (count ast)
     4 [nil (str/join (rest ast))]
     5 (let [[_ fname op cols cp] ast
-            [k sql] (to-sql params (assoc opts :sensitive false) cols)]
-        [k (when sql (str fname op sql cp))])
-    7 (let [[_ fname op _ cols _ cp] ast
-            [k sql] (to-sql params opts cols)]
+            [k sql] (to-sql params (assoc opts :sensitive true) cols)]
         [k (when sql (str fname op sql cp))])))
 
 (defmethod to-sql :cols [params {:keys [sensitive] :as opts} [_ & args]]
