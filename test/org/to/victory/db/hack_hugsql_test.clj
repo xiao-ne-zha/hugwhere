@@ -10,7 +10,7 @@
    ["test2" "where [a = 100 and b = :b or c like :c]"]
    ["list-users2" "where id = :id and [name like :l:name and is_valid = 1]"]
    ["test-influence" "where a = 1 and [b like :ll:b and c = 1] and [d = :d and e != 0]"]
-   ["test-func" "where a=1 and b = f(:b,1) and c = fs(:c,2)"]])
+   ["test-func" "where a=1 and b = f(:b,1) and c = fs(:c,:d)"]])
 
 (defn- sql-fn-str [[fn-name where]]
   (str "-- :name " fn-name " :? :* :D\nselect * from users\n--~ " where))
@@ -20,14 +20,23 @@
      (str/join "\n")
      hs/def-sqlvec-fns-from-string)
 
+(defn- iare2 [[_ [f]] p r]
+  (str (list f p) " => " r))
+
+(defmacro are2 [_ expr & body]
+  (let [prs (partition 2 body)
+        r (map #(apply iare2 expr %) prs)]
+    (str/join "\n" r)))
+
 (deftest test-use-func
   (are [params sqls]
       (= (test-func-sqlvec params) sqls)
     nil ["select * from users\nwhere a = 1"]
     {:b "name"} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
-    {:c 100} ["select * from users\nwhere a = 1 and c = fs(?,2)" 100]
-    {:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1) and c = fs(?,2)" "name" 100]
-    {:b nil :c 100} ["select * from users\nwhere a = 1 and c = fs(?,2)" 100]))
+    {:c 100} ["select * from users\nwhere a = 1"]
+    {:c 100, :d 1} ["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]
+    {:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+    {:b nil :c 100 :d 1} ["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]))
 
 (deftest test-sensitive-influence
   (are [params sqls] (= (test-influence-sqlvec params) sqls)
