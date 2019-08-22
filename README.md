@@ -51,35 +51,64 @@ For example , I use the def-sqlvec-fns
 ### Then you can test the flowing in repl:
 
 ```clojure
-(test-func-sqlvec nil) => ["select * from users\nwhere a = 1"]
-(test-func-sqlvec {:b "name"}) => ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
-(test-func-sqlvec {:c 100}) => ["select * from users\nwhere a = 1"]
-(test-func-sqlvec {:c 100, :d 1}) => ["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]
-(test-func-sqlvec {:b "name", :c 100}) => ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
-(test-func-sqlvec {:b nil, :c 100, :d 1}) => ["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]
-(test-influence-sqlvec nil) => ["select * from users\nwhere a = 1"]
-(test-influence-sqlvec {:b "x"}) => ["select * from users\nwhere a = 1 and b like ? and c = 1" "x%"]
-(test-influence-sqlvec {:d 100}) => ["select * from users\nwhere a = 1 and d = ? and e != 0" 100]
-(test-influence-sqlvec {:b "x", :d 100}) => ["select * from users\nwhere a = 1 and b like ? and c = 1 and d = ? and e != 0" "x%" 100]
-(test1-sqlvec nil) => ["select * from users\nwhere a = 100"]
-(test1-sqlvec {:b nil}) => ["select * from users\nwhere a = 100"]
-(test1-sqlvec {:b 1}) => ["select * from users\nwhere a = 100 and b = ?" 1]
-(test1-sqlvec {:c "name"}) => ["select * from users\nwhere a = 100 or c like ?" "name"]
-(test1-sqlvec {:b 1, :c "x"}) => ["select * from users\nwhere a = 100 and b = ? or c like ?" 1 "x"]
-(list-users-sqlvec nil) => ["select * from users\nwhere is_valid = 1"]
-(list-users-sqlvec {:id 1}) => ["select * from users\nwhere id = ? and is_valid = 1" 1]
-(list-users-sqlvec {:name "nezha"}) => ["select * from users\nwhere name like ? and is_valid = 1" "%nezha%"]
-(list-users-sqlvec {:id 1, :name "nezha"}) => ["select * from users\nwhere id = ? and name like ? and is_valid = 1" 1 "%nezha%"]
-(test2-sqlvec nil) => ["select * from users"]
-(test2-sqlvec {:b nil}) => ["select * from users"]
-(test2-sqlvec {:b 1}) => ["select * from users\nwhere a = 100 and b = ?" 1]
-(test2-sqlvec {:c "name"}) => ["select * from users\nwhere a = 100 or c like ?" "name"]
-(test2-sqlvec {:b 1, :c "x"}) => ["select * from users\nwhere a = 100 and b = ? or c like ?" 1 "x"]
-(list-users2-sqlvec nil) => ["select * from users"]
-(list-users2-sqlvec {:id 1}) => ["select * from users\nwhere id = ?" 1]
-(list-users2-sqlvec {:name "nezha"}) => ["select * from users\nwhere name like ? and is_valid = 1" "%nezha%"]
-(list-users2-sqlvec {:id 1, :name "nezha"}) => ["select * from users\nwhere id = ? and name like ? and is_valid = 1" 1 "%nezha%"]
+(test1-sqlvec nil) =>
+["select * from users\nwhere a = 100"]
+(test1-sqlvec {:b nil}) =>
+["select * from users\nwhere a = 100"]
+(test1-sqlvec {:b 1}) =>
+["select * from users\nwhere a = 100 and b = ?" 1]
+(test1-sqlvec {:c "name"}) =>
+["select * from users\nwhere a = 100 or c like ?" "name"]
+(test1-sqlvec {:b 1, :c "x"}) =>
+["select * from users\nwhere a = 100 and b = ? or c like ?" 1 "x"]
+(list-users-sqlvec nil) =>
+["select * from users\nwhere is_valid = 1"]
+(list-users-sqlvec {:id 1}) =>
+["select * from users\nwhere id = ? and is_valid = 1" 1]
+(list-users-sqlvec {:name "nezha"}) =>
+["select * from users\nwhere name like ? and is_valid = 1" "%nezha%"]
+(list-users-sqlvec {:id 1, :name "nezha"}) =>
+["select * from users\nwhere id = ? and name like ? and is_valid = 1" 1 "%nezha%"]
+(test2-sqlvec nil) =>
+["select * from users"]
+(test2-sqlvec {:b nil}) =>
+["select * from users"]
+(test2-sqlvec {:b 1}) =>
+["select * from users\nwhere a = 100 and b = ?" 1]
+(test2-sqlvec {:c "name"}) =>
+["select * from users\nwhere a = 100 or c like ?" "name"]
+(test2-sqlvec {:b 1, :c "x"}) =>
+["select * from users\nwhere a = 100 and b = ? or c like ?" 1 "x"]
+(list-users2-sqlvec nil) =>
+["select * from users"]
+(list-users2-sqlvec {:id 1}) =>
+["select * from users\nwhere id = ?" 1]
+(list-users2-sqlvec {:name "nezha"}) =>
+["select * from users\nwhere name like ? and is_valid = 1" "%nezha%"]
+(list-users2-sqlvec {:id 1, :name "nezha"}) =>
+["select * from users\nwhere id = ? and name like ? and is_valid = 1" 1 "%nezha%"]
+(test-influence-sqlvec nil) =>
+["select * from users\nwhere a = 1"]
+(test-influence-sqlvec {:b "x"}) =>
+["select * from users\nwhere a = 1 and b like ? and c = 1" "x%"]
+(test-influence-sqlvec {:d 100}) =>
+["select * from users\nwhere a = 1 and d = ? and e != 0" 100]
+(test-influence-sqlvec {:b "x", :d 100}) =>
+["select * from users\nwhere a = 1 and b like ? and c = 1 and d = ? and e != 0" "x%" 100]
+(test-func-sqlvec nil) =>
+["select * from users\nwhere a = 1"]
+(test-func-sqlvec {:b "name"}) =>
+["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+(test-func-sqlvec {:c 100}) =>
+["select * from users\nwhere a = 1"]
+(test-func-sqlvec {:c 100, :d 1}) =>
+["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]
+(test-func-sqlvec {:b "name", :c 100}) =>
+["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+(test-func-sqlvec {:b nil, :c 100, :d 1}) =>
+["select * from users\nwhere a = 1 and c = fs(?,?)" 100 1]
 ```
+
 
 ## Examples project
 
