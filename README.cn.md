@@ -1,4 +1,5 @@
 # hugwhere
+我想如果你喜欢用sql访问数据库，你会喜欢使用[hugsql](https://www.hugsql.org/),那么你一定会喜欢用hugwhere来省去拼写动态where条件的繁琐。
 
 该工具主要是方便配置hugsql的动态where语句。主要功能有
   * 1.根据参数中非nil值，动态拼接where语句，丢弃其中nil值参数相关的sql片段。如`where a = :a or b like :b` 在参数:b为nil时，输出`where a = :a`

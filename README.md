@@ -1,4 +1,5 @@
 # hugwhere
+ Like sql => like hugsql => like hugwhere, yes, you do!
 中文说明请参看 [README.cn](https://github.com/xiao-ne-zha/hugwhere/blob/master/README.cn.md)
 
 ## Usage
