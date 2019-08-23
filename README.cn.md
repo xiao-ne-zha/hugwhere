@@ -26,7 +26,7 @@ lein依赖中添加：`[org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"]`
 
 ### 在sql文件中的使用
 按hugsql约定，在resouces/xxx.sql里面写明你的函数，下面是几个例子
-注意在 :name 行的最后增加 :D 是打开动态where的开关
+注意在 :name 行的最后增加 :D 是打开动态where的开关。 而 --~ where ... 是单行动态where的写法， /*~ where ... ~*/ 是多行动态where的写法
 
 ```clojure
 -- :name test1 :? :* :D

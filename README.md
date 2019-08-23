@@ -15,7 +15,7 @@ Added in lein dependency:
 
 ### Use in sql file
 For example write your function in rechouces/xxx.sql.
-  * Note: the `:D` is the key of hugwhere
+  * Note: the `:D` is the key of hugwhere, and you can see the trick in the following: --~ where ... or /*~ where ... ~*/
 
 ```clojure
 -- :name test1 :? :* :D
