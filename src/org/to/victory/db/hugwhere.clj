@@ -3,4 +3,4 @@
             [clojure.string :as str]))
 
 (defn where [params where-clause]
-  (to-sql params nil (where-parser where-clause)))
+  (nth (to-sql params nil (where-parser where-clause)) 2))

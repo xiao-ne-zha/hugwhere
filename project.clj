@@ -1,5 +1,6 @@
-(defproject org.to.victory.db/hugwhere "0.1.0-SNAPSHOT"
-  :description "dynamic `where conditions` when you use hugsql to create your function that access database\n 当你使用hugsql来编写数据库访问函数时，该库可以让你省去编写动态拼接where条件的繁琐"
+(defproject org.to.victory.db/hugwhere "0.1.1"
+  :description "dynamic `where conditions` when you use hugsql to create your function that access database
+当你使用hugsql来编写数据库访问函数时，该库可以让你省去编写动态拼接where条件的繁琐"
   :url "https://github.com/xiao-ne-zha/hugwhere"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}

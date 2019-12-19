@@ -23,6 +23,13 @@
       nil nil
       {:b nil} nil
       {:b 1} "where a = 100 and b = :b"
+      {:c "name"} "where c like :c"
+      {:b 1 :c "x"} "where a = 100 and b = :b or c like :c"))
+  (testing "sense c but not b"
+    (are [params exp] (= (where params "where [[a = 100 and b = :b] or c like :c]") exp)
+      nil nil
+      {:b nil} nil
+      {:b 1} nil
       {:c "name"} "where a = 100 or c like :c"
       {:b 1 :c "x"} "where a = 100 and b = :b or c like :c"))
   (testing "sensitive in readme"

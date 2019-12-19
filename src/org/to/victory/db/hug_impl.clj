@@ -4,73 +4,105 @@
              [clojure.java.io :as io]))
 
 (defparser ^:private hwp (slurp (io/resource "hugwhere.bnf")) :auto-whitespace :standard)
-(def where-parser (memoize hwp))
+(def where-parser #_(memoize hwp) hwp)
 
-(defmulti to-sql (fn [params opts ast] (first ast)) :default nil)
+;; 返回结果 [exps acts sql]
+;; 在参数敏感时，exps必须返回期望的参数，acts返回实际有值的参数，sql转换的结果
+;; 在参数不敏感时，exps 和 acts 为空，sql取实际值
+(defmulti to-sql (fn [params sensitive ast] (first ast)) :default nil)
 
-(defmethod to-sql nil [params opts ast]
-  (if (vector? ast) (to-sql params opts (second ast)) [nil ast]))
+(defn- keep? [exps acts]
+  (if-not (empty? exps)
+    (some identity acts)
+    true))
 
-(defmethod to-sql :where-clause [params opts [_ w c]]
-  (let [[k sql] (to-sql params opts c)]
-    (when-not (str/blank? sql)
-      (str "where " sql))))
+(defn- concat-with-space [msql & others]
+  (apply str msql (when (and msql (not= (last msql) \space)) \space) others))
 
-(defmethod to-sql :conds [params {:keys [sensitive] :as opts} [_ & cs]]
-  (let [opts (dissoc opts :sensitive)
-        sqls (map (partial to-sql params opts) cs)
-        sqls (partition 2 (cons [nil "and"] sqls))
-        need-const-cond (if sensitive
-                          (not-empty (filter (fn [[_ [k v]]] (and (not (nil? k)) v)) sqls))
-                          true)
-        sql (reduce
-             (fn [r [[_ o] [k c]]]
-               (if (or k need-const-cond)
-                 (if (str/blank? c) r (str r " " o " " c))
-                 r))
-             ""
-             sqls)]
-    [need-const-cond (str/replace-first sql #"\s*(and|or)\s*" "")]))
+(defn- concat-sql [params sensitive ocs]
+  (let [[es as sql]
+        (reduce (fn [[mes mas msql] c]
+                  (let [[e a s] (to-sql params sensitive c)
+                        s (if (and (keep? e a) (not-empty s))
+                            (concat-with-space msql s)
+                            msql)]
+                    (if sensitive
+                      [(concat mes e) (concat mas a) s]
+                      [mes mas s]))) [] ocs)]
+    (if sensitive [es as (when (keep? es as) sql)] [nil nil sql])))
 
-(defmethod to-sql :cond [params opts [_ co c cp]]
-  (if c
-    (let [[k sql] (to-sql params opts c)]
-      (when-not (str/blank? sql) (str co sql cp)))
-    (to-sql params opts co)))
+(defmethod to-sql nil [params sensitive ast]
+  (if (string? ast) [nil nil ast]
+      (let [[_ & ocs] ast]
+        (concat-sql params sensitive ocs))))
 
-(defmethod to-sql :atom-cond [params opts [_ le co re]]
-  (let [[k sql] (to-sql params opts re)
-        [lk lsql] (to-sql params opts le)]
-    [(or lk k) (when-not (or (str/blank? lsql) (str/blank? sql)) (str lsql " " co " " sql))]))
+(defmethod to-sql :sc [params sensitive [_ l c r]]
+  (if r
+    (let [sensitive (if (= "]" r) (not sensitive) sensitive)
+          [exp act sql] (to-sql params sensitive c)
+          sql (when-not (empty? sql) (if (= "]" r) sql (str l sql r)))]
+      (if sensitive
+        [exp act (when-not (empty? sql) (if (= "]" r) sql (str l sql r)))]
+        [nil nil sql]))
+    (to-sql params sensitive l)))
 
-(defmethod to-sql :sensitive-conds [params opts [_ ob cs cb]]
-  (when-let [cs (to-sql params (assoc opts :sensitive true) cs)]
-    cs))
+(defmethod to-sql :cc [params sensitive [_ & ctt]]
+  (let [[exp act sql]
+        (reduce (fn [[es as msql] e]
+                  (let [[exp act sql] (to-sql params sensitive e)]
+                    [(concat es exp) (concat as act)
+                     (if sql (concat-with-space msql sql) msql)])) [] ctt)]
+    (if (= :func (first (nth ctt 2)))
+      [exp act (if (and (not-empty exp) (not-every? true? act)) nil sql)]
+      [exp act (when (keep? exp act) sql)])))
 
-(defmethod to-sql :value-list [params opts [_ op kid cp]]
-  (let [[k sql] (to-sql params opts kid)]
-    [k (when sql (str op sql cp))]))
+(defmethod to-sql :KID [params sensitive [_ kid]]
+  (let [k (keyword (str/replace-first kid #"(:[-\w]+\*?)?:(\S+)" "$2"))
+        hk (not (nil? (get params k)))]
+    [[k] [hk] (when hk kid)]))
 
-(defmethod to-sql :func [params opts ast]
-  (case (count ast)
-    4 [nil (str/join (rest ast))]
-    5 (let [[_ fname op cols cp] ast
-            [k sql] (to-sql params (assoc opts :sensitive true) cols)]
-        [k (when sql (str fname op sql cp))])))
+(defn- to-lo-sql [lo params sensitive ocs]
+  (let [[es as sql] (->> (cons lo ocs)
+                         (partition 2)
+                         (reduce (fn [[mes mas msql] [o c]]
+                                   (let [[e a s] (to-sql params sensitive c)
+                                         s (if (and (keep? e a) (not-empty s))
+                                             (concat-with-space msql o \space s)
+                                             msql)]
+                                     (if (or (keep? e a) sensitive)
+                                       [(concat mes e) (concat mas a) s]
+                                       [mes mas s]))) []))
+        sql (when sql (str/trim (str/replace sql #"^(and|or)\s" "")))]
+    [es as sql]))
 
-(defmethod to-sql :cols [params {:keys [sensitive] :as opts} [_ & args]]
-  (let [sqls (map (partial to-sql params opts) args)]
+(defmethod to-sql :conds [params sensitive [_ & ocs]]
+  (to-lo-sql "or" params sensitive ocs))
+
+(defmethod to-sql :ac [params sensitive [_ & ocs]]
+  (to-lo-sql "and" params sensitive ocs))
+
+(defmethod to-sql :where-clause [params sensitive [_ w cs & clauses]]
+  (let [[exps acts sql] (to-sql params sensitive cs)
+        sql (when-not (empty? sql) (str w " " sql))
+        sqls (map #(->> (to-sql params sensitive %) rest second) clauses)
+        sql (str/join (cons sql sqls))
+        sql (if (empty? sql) nil sql)]
+    (if sensitive [exps acts (when (keep? exps acts) sql)] [nil nil sql])))
+
+(defmethod to-sql :func [params sensitive ast]
+  (if (= 4 (count ast))
+    [nil nil (str/join (rest ast))]
+    (let [[_ fname lp cols rp] ast
+          [es as sql] (to-sql params true cols)]
+      [es as (when sql (str fname lp sql rp))])))
+
+(defmethod to-sql :cols [params sensitive [_ & args]]
+  (let [sqls (map (partial to-sql params sensitive) args)]
     (if sensitive
-      (let [has-key (not-empty (filter (fn [[k v]] k) sqls))
-            clear (not-empty (filter (fn [[k v]] (nil? v)) sqls))]
-        (if clear
-          [true nil]
-          [has-key (reduce (fn [r [k v]] (if (str/blank? v) r (if r (str r "," v) v))) nil sqls)]))
-      [nil (reduce (fn [r [k v]] (if (str/blank? v) r (if r (str r "," v) v))) nil sqls)]))
-  )
-
-(defmethod to-sql :KID [params {sen :sensitive :or {sen true}} [_ kid]]
-  (if sen
-    (let [k (keyword (str/replace-first kid #"(:[-\w]+\*?)?:(\S+)" "$2"))]
-      [k (when-not (nil? (get params k)) kid)])
-    [nil kid]))
+      (reduce (fn [[es as sql] [e a s]]
+                [(concat es e) (concat as a)
+                 (if (str/blank? s) sql (if sql (str sql "," s) s))])
+              []
+              sqls)
+      [nil nil
+       (reduce (fn [r [_ _ v]] (if (str/blank? v) r (if r (str r "," v) v))) nil sqls)])))

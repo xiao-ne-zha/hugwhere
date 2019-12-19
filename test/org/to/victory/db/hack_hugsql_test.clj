@@ -77,7 +77,7 @@
       nil ["select * from users"]
       {:b nil} ["select * from users"]
       {:b 1} ["select * from users\nwhere a = 100 and b = ?" 1]
-      {:c "name"} ["select * from users\nwhere a = 100 or c like ?" "name"]
+      {:c "name"} ["select * from users\nwhere c like ?" "name"]
       {:b 1 :c "x"} ["select * from users\nwhere a = 100 and b = ? or c like ?" 1 "x"]))
   (testing "sensitive in readme"
     (are [params exp] (= (list-users2-sqlvec params) exp)
