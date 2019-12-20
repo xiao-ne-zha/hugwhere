@@ -4,7 +4,7 @@
              [clojure.java.io :as io]))
 
 (defparser ^:private hwp (slurp (io/resource "hugwhere.bnf")) :auto-whitespace :standard)
-(def where-parser #_(memoize hwp) hwp)
+(def where-parser (memoize hwp))
 
 ;; 返回结果 [exps acts sql]
 ;; 在参数敏感时，exps必须返回期望的参数，acts返回实际有值的参数，sql转换的结果
