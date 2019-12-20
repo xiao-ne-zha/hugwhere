@@ -83,10 +83,10 @@
 
 (defmethod to-sql :where-clause [params sensitive [_ w cs & clauses]]
   (let [[exps acts sql] (to-sql params sensitive cs)
-        sql (when-not (empty? sql) (str w " " sql))
+        sql (when-not (str/blank? sql) (str w " " sql))
         sqls (map #(->> (to-sql params sensitive %) rest second) clauses)
         sql (str/join (cons sql sqls))
-        sql (if (empty? sql) nil sql)]
+        sql (if (str/blank? sql) nil sql)]
     (if sensitive [exps acts (when (keep? exps acts) sql)] [nil nil sql])))
 
 (defmethod to-sql :func [params sensitive ast]
