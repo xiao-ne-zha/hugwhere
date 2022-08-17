@@ -18,10 +18,15 @@
 (defn -main
   [& args]
   (m/start)
+  (println "(list-users):")
+  (print-table (list-users))
   (println "(list-users {:id 4}):")
   (print-table (list-users {:id 4}))
   (println "(list-users {:name \"a\"}):")
   (print-table (list-users {:name "a"}))
+
+  (println "(list-users2):")
+  (print-table (list-users2))
   (println "(list-users2 {:id 4}):")
   (print-table (list-users2 {:id 4}))
   (println "(list-users2 {:name \"a\"}):")
