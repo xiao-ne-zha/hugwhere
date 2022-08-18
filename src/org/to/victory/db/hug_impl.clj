@@ -24,7 +24,10 @@
           (swap! mem assoc args ret)
           ret)))))
 
-(def get-sql-through-cache (lcache4fn 300 to-hugsql))
+;; 定义该函数，是为了不缓存多态方法
+(defn get-sql [pks ast]
+  (to-hugsql pks ast))
+(def get-sql-through-cache (lcache4fn 300 get-sql))
 
 (defn to-sql [params where-clause]
   (let [ast (where-parser where-clause)
@@ -44,9 +47,11 @@
     kid))
 
 (defmethod to-hugsql :where-clause [pks [_ where conds]]
-  (when-let [sql (to-hugsql pks conds)]
-    (when-not (str/blank? sql)
-      (str where \space sql))))
+  (if (nil? conds)
+    (to-hugsql pks where)
+    (when-let [sql (to-hugsql pks conds)]
+      (when-not (str/blank? sql)
+        (str where \space sql)))))
 
 (defmethod to-hugsql :conds [pks [_ & conds]]
   (->> conds

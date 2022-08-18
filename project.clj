@@ -1,4 +1,4 @@
-(defproject org.to.victory.db/hugwhere "0.2.1"
+(defproject org.to.victory.db/hugwhere "0.2.2"
   :description "dynamic `where conditions` when you use hugsql to create your function that access database
 当你使用hugsql来编写数据库访问函数时，该库可以让你省去编写动态拼接where条件的繁琐"
   :url "https://github.com/xiao-ne-zha/hugwhere"

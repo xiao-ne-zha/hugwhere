@@ -1,4 +1,4 @@
-where-clause = WHERE conds
+where-clause = WHERE? conds
 conds = cond+
 cond = elements | LB (elements/cond)+ RB
 <elements> = element+
