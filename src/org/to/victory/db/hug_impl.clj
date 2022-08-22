@@ -32,8 +32,10 @@
 (defn to-sql [params where-clause]
   (let [ast (where-parser where-clause)
         hav-v-params (remove (fn [[k v]] (nil? v)) params)
-        pks (->> hav-v-params (into {}) keys set)]
-    (get-sql-through-cache pks ast)))
+        pks (->> hav-v-params (into {}) keys set)
+        sql (get-sql-through-cache pks ast)]
+    (when-not (empty? sql)
+      sql)))
 
 (defmethod to-hugsql nil [pks ast]
   (when (string? ast) ast))
