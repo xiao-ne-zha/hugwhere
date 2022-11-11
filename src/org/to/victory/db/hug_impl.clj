@@ -2,11 +2,19 @@
   (:require  [clojure.string :as str]
              [instaparse.core :refer [defparser] :as insta]
              [clojure.core.cache :as cache]
-             [clojure.java.io :as io]))
+             [clojure.java.io :as io]
+             [hugsql.parameters :as hp]))
 
+(def REGEX-KID #"(:[-\w]+\*?)?:[-\w]+(\.[-\w]+)*")
 (defparser ^:private hwp (slurp (io/resource "hugwhere.bnf")) :auto-whitespace :standard)
 (def where-parser (memoize hwp))
-
+(defn- to-param-id [kid]
+  (keyword (str/replace-first kid #"(:[-\w]+\*?)?:(\S+)" "$2")))
+(defn- get-all-key-from-sql [sql]
+  (when (and sql (string? sql))
+    (->> (re-seq REGEX-KID sql)
+         (map first)
+         (map to-param-id))))
 ;; 返回结果 sql
 ;; 每层中括号仅仅管理本层的exps和acts关系
 (defmulti to-hugsql (fn [param-keyset ast] (first ast)) :default nil)
@@ -29,24 +37,29 @@
   (to-hugsql pks ast))
 (def get-sql-through-cache (lcache4fn 300 get-sql))
 
+
 (defn to-sql [params where-clause]
   (let [ast (where-parser where-clause)
-        hav-v-params (remove (fn [[k v]] (nil? v)) params)
-        pks (->> hav-v-params (into {}) keys set)
-        sql (get-sql-through-cache pks ast)]
+        ;;hav-v-params (remove (fn [[k v]] (nil? v)) params)
+        ;;pks (->> hav-v-params (into {}) keys set)
+        pks (get-all-key-from-sql where-clause)
+        pks (filter #(get-in params (hp/deep-get-vec %)) pks)
+        sql (get-sql-through-cache (set pks) ast)]
     (when-not (empty? sql)
       sql)))
 
 (defmethod to-hugsql nil [pks ast]
   (when (string? ast) ast))
 
-(defn- to-param-id [kid]
-  (keyword (str/replace-first kid #"(:[-\w]+\*?)?:(\S+)" "$2")))
-
 (defmethod to-hugsql :KID [pks [_ kid]]
   (let [exp-k (to-param-id kid)
         act-k (get pks exp-k)]
-    kid))
+    (when act-k kid)))
+
+#_(defmethod to-hugsql :KID [pks [_ kid]]
+    (let [exp-k (to-param-id kid)
+          act-k (get pks exp-k)]
+      kid))
 
 (defmethod to-hugsql :where-clause [pks [_ where conds]]
   (if (nil? conds)
@@ -62,27 +75,13 @@
        (remove empty?)
        (str/join \space)))
 
-(defmethod to-hugsql :cond [pks [_ & ast]]
-  (if (= "[" (first ast))
-    (let [cds (-> ast rest drop-last)
-          deps (map #(let [tp (first %)]
-                       (cond
-                         (= :KID tp) (to-param-id (second %))
-                         (= :cond tp) :indirect-dep
-                         :else nil))
-                    cds)
-          ddeps (remove #(or (nil? %) (= :indirect-dep %)) deps)
-          sqls (map #(to-hugsql pks %) cds)
-          ideps (filter #(= :indirect-dep %) deps)
-          real-ideps (filter identity (map #(and (= :indirect-dep %1) %2) deps sqls))]
-      (if (empty? ddeps) ;; 没有需要的直接依赖，检查是否有间接依赖，如果没有间接依赖，直接保留所有sql。如果有间接依赖，当间接依赖都没有值时，舍弃，只要有一个间接依赖有值，就应该保留
-        (cond
-          (empty? ideps) (str/join \space (remove nil? sqls))
-          (empty? real-ideps) nil
-          :else (str/join \space (remove nil? sqls)))
-        (when (some pks ddeps) ;; 需要直接依赖，直接依赖又有值时
-          (str/join \space (remove nil? sqls)))))
-    (->> ast
-         (map #(to-hugsql pks %))
-         (remove empty?)
-         (str/join \space))))
+(defmethod to-hugsql :cond [pks [_ & elements]]
+  (let [idx-types (map-indexed (fn [idx e] [idx (first e)]) elements)
+        idx-deps (remove nil?
+                         (map (fn [[idx tp]] (when (#{:cond :KID} tp) idx)) idx-types))
+        sql-elements (mapv (fn [e]
+                             (if (string? e) e (to-hugsql pks e)))
+                           elements)
+        deps-result (map #(get sql-elements %) idx-deps)]
+    (when-not (every? nil? deps-result)
+      (str/join \space sql-elements))))
