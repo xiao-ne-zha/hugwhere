@@ -2,26 +2,29 @@
 我想如果你喜欢用sql访问数据库，你会喜欢使用[hugsql](https://www.hugsql.org/),那么你一定会喜欢用hugwhere来省去拼写动态where条件的繁琐。
 
 该工具主要是方便配置hugsql的动态where语句。主要功能有
-  * 1.根据参数中非nil值，动态拼接where语句，丢弃其中nil值参数相关的sql片段。如`where a = :a [or b like :b]` 在参数:b为nil时，输出`where a = :a`
-  * 2.默认保留无变参部分的sql片段。如`where a=1 [and b = :b]` 在参数:b为nil时，输出结果为`where a=1`
-  * 3.可以强制随变参存在或消失的sql片段。如`where [a=1 and b = :b]` 在参数:b为nil时，输出结果为nil
+  * 1.根据参数中非nil值，动态拼接where语句，丢弃其中nil值参数相关的sql片段。如`where a = :a [[ or b like :b ]]` 在参数:b为nil时，输出`where a = :a`
+  * 2.默认保留无变参部分的sql片段。如`where a=1 [[ and b = :b ]]` 在参数:b为nil时，输出结果为`where a=1`
+  * 3.可以强制随变参存在或消失的sql片段。如`where [[ a=1 and b = :b ]]` 在参数:b为nil时，输出结果为nil
   * 4.支持where中使用函数, 需要注意，函数内如果有使用到参数，需要将参数 :x 前后以空格隔开
   * 5.增加了三种用于like的值语法，感谢hugsql的设计，当你依赖了本库就可以直接在sql文件中使用着三种语法。这三种分别是
     * 5.1 中间像: `:like:value` 或 简写 `:l:value`, 会将传入的`value`转变为 `%value%` 形式
     * 5.2 左边像: `:left-like:value` 或简写 `:ll:value`, 会将传入的`value`转变为 `value%` 形式
     * 5.3 右边像: `:right-like:value` 或简写 `:rl:value`, 会将传入的`value`转变为 `%value` 形式
-  * 6. 最新的0.2.2版本增加了没有`where`开头的条件部分的动态拼接
+  * 6. 最新的0.3.0 版本增加了没有`where`开头的条件部分的动态拼接
 
-注意：动态部分，主要靠[]中括号来确定，中括号的使用规则如下，可以参见sql文件中使用的例子进行理解。
+注意：动态部分，主要靠双[[ ]]中括号来确定，中括号的使用规则如下，可以参见sql文件中使用的例子进行理解。
   * 1. 无中括号包括的部分，认为是固定sql，保留原样输出，不做动态拼接
   * 2. 中括号内的关键字参数 :x , 前后需有空格隔开。中括号内的关键字参数为中括号内sql片段的直接依赖。当直接依赖的参数，全部未提供时，中括内的sql片段全部丢弃
   * 3. 中括号内可以嵌套中括号。 嵌套的中括号作为间接依赖。当一个中括号内部，仅仅有间接依赖时，间接依赖全部为空，就丢弃中括号内的sql片段。否则，拼接中括内的sql片段。
+  * 4. 双中括号前后要有空格
+  * 5. 从单中括号改为双中括号是为了避免与sql中的单中括号分隔符发生冲突。即使这样在sql中为了避免出错最好对于连续的两个单中括号中间加上空格，以避免与双中括号冲突。
+  * 6. 对于取值部分如 name = :name 中的:name, 如果需要进行类型强转，不要在取之部分进行强转。即转为 name::bigint = :name , 不要写作 name = :name::bigint
 
 ## 使用方法
 
 ### 安装依赖
 
-lein依赖中添加：`[org.to.victory.db/hugwhere "0.2.1"]`
+lein依赖中添加：`[org.to.victory.db/hugwhere "0.3.0"]`
 
 ### 在代码中初始化hugwhere
 
@@ -38,27 +41,27 @@ lein依赖中添加：`[org.to.victory.db/hugwhere "0.2.1"]`
 ```clojure
 -- :name test1 :? :* :D
 select * from users
---~ where a = 100 [and b = :b] [or c like :c]
+--~ where a = 100 [[ and b = :b ]] [[ or c like :c ]]
 
 -- :name list-users :? :* :D
 select * from users
---~ where [id = :id and] [name like :l:name and] is_valid = 1
+--~ where [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1
 
 -- :name test2 :? :* :D
 select * from users
---~ where [a = 100 [and b = :b] [or c like :c]]
+--~ where [[ a = 100 [[ and b = :b ]] [[ or c like :c ]] ]]
 
 -- :name list-users2 :? :* :D
 select * from users
---~ where [[id = :id and] [name like :l:name and] is_valid = 1]
+--~ where [[ [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1 ]]
 
 -- :name test-influence :? :* :D
 select * from users
---~ where a = 1 [and b like :ll:b and c = 1] [and d = :d and e != 0]
+--~ where a = 1 [[ and b like :ll:b and c = 1 ]] [[ and d = :d and e != 0 ]]
 
 -- :name test-func :? :* :D
 select * from users
---~ where a = 1 [and b = f( :b ,1)] [and c = fs( :c , :d )]
+--~ where a = 1 [[ and b = f( :b ,1) ]] [[ and c = fs( :c , :d ) ]]
 ```
 
 ### 根据上述文件生成数据库访问函数

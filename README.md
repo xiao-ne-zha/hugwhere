@@ -2,12 +2,30 @@
  Like sql => like hugsql => like hugwhere, yes, you do!
 中文说明请参看 [README.cn](https://github.com/xiao-ne-zha/hugwhere/blob/master/README.cn.md)
 
+This tool is mainly designed to facilitate the configuration of dynamic WHERE statements in HugSQL. Its main features include:
+    * 1. Dynamically concatenating WHERE statements based on non-nil parameters, discarding SQL fragments related to nil values. For example, where a = :a [[ or b like :b ]] will output where a = :a when the parameter b is nil.
+    * 2. By default, preserving SQL fragments without variable parts. For example, where a=1 [[ and b = :b ]] will output where a=1 when the parameter b is nil.
+    * 3. Forcing SQL fragments to be present or absent depending on the presence of variable parts. For example, where [[ a=1 and b = :b ]] will output nil when the parameter b is nil.
+    * 4. Supporting the use of functions within WHERE statements. Note that if the function uses a parameter, it should be separated from :x by spaces.
+    * 5. Adding three syntax options for the LIKE operator. Thanks to HugSQL's design, you can use these three syntax options directly in your SQL files once you've depended on this library. The three options are:
+      * 5.1 Middle match: :like:value or abbreviated as :l:value. This will convert the passed-in value to the form %value%.
+      * 5.2 Left match: :left-like:value or abbreviated as :ll:value. This will convert the passed-in value to the form value%.
+      * 5.3 Right match: :right-like:value or abbreviated as :rl:value. This will convert the passed-in value to the form %value.
+    * 6. The latest version 0.3.0 adds support for dynamically concatenating conditional parts without a where clause at the beginning.
+
+Note: The dynamic part of the tool mainly relies on the double [[ ]] brackets to determine. The usage rules of brackets are as follows, which can be understood by referring to the examples used in the SQL file.
+    * 1. The part without brackets is considered as fixed SQL, which is output as it is without dynamic concatenation.
+    * 2. The keyword parameter :x in the brackets must be separated by spaces before and after. The keyword parameters in the brackets are directly dependent on the SQL fragments in the brackets. When all the directly dependent parameters are not provided, all the SQL fragments in the brackets are discarded.
+    * 3. The brackets can be nested in the brackets. The nested brackets are indirect dependencies. When there are only indirect dependencies inside a bracket, and all the indirect dependencies are empty, the SQL fragments inside the brackets are discarded. Otherwise, concatenate the SQL fragments inside the brackets.
+    * 4. There should be spaces before and after the double brackets.
+    * 5. The double brackets were changed from single brackets to avoid conflicts with the parentheses separators in SQL. Even so, to avoid conflicts with the double brackets, it is best to add spaces between consecutive single brackets in the SQL.
+    * 6. For the value part, such as :name in name = :name, if type conversion is needed, do not perform type conversion in the value part. That is, convert name::bigint = :name, do not write name = :name::bigint.
 ## Usage
 
 ### Installation dependency
 
 Added in lein dependency:
-`[org.to.victory.db/hugwhere "0.2.1"]`
+`[org.to.victory.db/hugwhere "0.3.0"]`
 
 ### Initialize hugwhere in the code
 
@@ -21,27 +39,27 @@ For example write your function in resources/xxx.sql.
 ```clojure
 -- :name test1 :? :* :D
 select * from users
---~ where a = 100 [and b = :b] [or c like :c]
+--~ where a = 100 [[ and b = :b ]] [[ or c like :c ]]
 
 -- :name list-users :? :* :D
 select * from users
---~ where [id = :id and] [name like :l:name and] is_valid = 1
+--~ where [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1
 
 -- :name test2 :? :* :D
 select * from users
---~ where [a = 100 [and b = :b] [or c like :c]]
+--~ where [[ a = 100 [[ and b = :b ]] [[ or c like :c ]] ]]
 
 -- :name list-users2 :? :* :D
 select * from users
---~ where [[id = :id and] [name like :l:name and] is_valid = 1]
+--~ where [[ [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1 ]]
 
 -- :name test-influence :? :* :D
 select * from users
---~ where a = 1 [and b like :ll:b and c = 1] [and d = :d and e != 0]
+--~ where a = 1 [[ and b like :ll:b and c = 1 ]] [[ and d = :d and e != 0 ]]
 
 -- :name test-func :? :* :D
 select * from users
---~ where a = 1 [and b = f( :b ,1)] [and c = fs( :c , :d )]
+--~ where a = 1 [[ and b = f( :b ,1) ]] [[ and c = fs( :c , :d ) ]]
 ```
 
 ### Use hugsql api to create these functions

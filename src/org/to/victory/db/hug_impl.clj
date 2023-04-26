@@ -5,7 +5,8 @@
              [clojure.java.io :as io]
              [hugsql.parameters :as hp]))
 
-(def REGEX-KID #"(:[-\w]+\*?)?:[-\w]+(\.[-\w]+)*")
+;;(def REGEX-KID #"(:[-\w]+\*?)?:[-\w]+(\.[-\w]+)*")
+(def REGEX-KID #"((?<!\\):[-\w]+\*?)?(?<!\\):[-\w]+(\.[-\w]+)*")
 (defparser ^:private hwp (slurp (io/resource "hugwhere.bnf")) :auto-whitespace :standard)
 (def where-parser (memoize hwp))
 (defn- to-param-id [kid]

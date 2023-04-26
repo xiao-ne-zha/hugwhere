@@ -5,13 +5,13 @@
             [clojure.string :as str]))
 
 (def dbfn-sql
-  [["test1" "where a = 100 [and b = :b] [or c like :c]"]
-   ["list-users" "where [id = :id and] [name like :l:name and] is_valid = 1"]
-   ["test2" "where [a = 100 [and b = :b] [or c like :c]]"]
-   ["list-users2" "where [[id = :id and] [name like :l:name and] is_valid = 1]"]
-   ["test-influence" "where a = 1 [and b like :ll:b and c = 1] [and d = :d and e != 0]"]
-   ["test-func" "where a = 1 [and b = f( :b ,1)] [and c = fs( :c , :d )]"]
-   ["test-func2" "where a = 1 [and b = f(f2( :b ),1)]"]])
+  [["test1" "where a = 100 [[ and b = :b ]] [[ or c like :c ]]"]
+   ["list-users" "where [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1"]
+   ["test2" "where [[ a = 100 [[ and b = :b ]] [[ or c like :c ]] ]]"]
+   ["list-users2" "where [[ [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1 ]]"]
+   ["test-influence" "where a = 1 [[ and b like :ll:b and c = 1 ]] [[ and d = :d and e != 0 ]]"]
+   ["test-func" "where a = 1 [[ and b = f( :b ,1) ]] [[ and c = fs( :c , :d ) ]]"]
+   ["test-func2" "where a = 1 [[ and b = f(f2( :b ),1) ]]"]])
 
 (defn- sql-fn-str [[fn-name where]]
   (str "-- :name " fn-name " :? :* :D\nselect * from users\n--~ " where))
