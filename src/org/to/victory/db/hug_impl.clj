@@ -55,6 +55,9 @@
 (defmethod to-hugsql :KID [pks [_ kid]]
   kid)
 
+(defmethod to-hugsql :STR [pks [_ & ss]]
+  (str/join ss))
+
 (defn- kid->sql-sensitive [pks [_ kid]]
   (let [exp-k (to-param-id kid)
         act-k (get pks exp-k)]

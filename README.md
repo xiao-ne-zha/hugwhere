@@ -20,7 +20,7 @@ This tool is mainly designed to facilitate the configuration of dynamic WHERE st
 * The brackets can be nested in the brackets. The nested brackets are indirect dependencies. When there are only indirect dependencies inside a bracket, and all the indirect dependencies are empty, the SQL fragments inside the brackets are discarded. Otherwise, concatenate the SQL fragments inside the brackets.
 * There should be spaces before and after the double brackets.
 * The double brackets were changed from single brackets to avoid conflicts with the parentheses separators in SQL. Even so, to avoid conflicts with the double brackets, it is best to add spaces between consecutive single brackets in the SQL.
-* For the value part, such as :name in name = :name, if type conversion is needed, do not perform type conversion in the value part. That is, convert name::bigint = :name, do not write name = :name::bigint.
+
 ## Usage
 
 ### Installation dependency
