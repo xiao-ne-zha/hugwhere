@@ -12,7 +12,6 @@ This tool is mainly designed to facilitate the configuration of dynamic WHERE st
    *  5.1 Middle match: :like:value or abbreviated as :l:value. This will convert the passed-in value to the form %value%.
    *  5.2 Left match: :left-like:value or abbreviated as :ll:value. This will convert the passed-in value to the form value%.
    *  5.3 Right match: :right-like:value or abbreviated as :rl:value. This will convert the passed-in value to the form %value.
-* 6. The latest version 0.3.0 adds support for dynamically concatenating conditional parts without a where clause at the beginning.
 
 **Note: The dynamic part of the tool mainly relies on the double [[ ]] brackets to determine. The usage rules of brackets are as follows, which can be understood by referring to the examples used in the SQL file.**
 * The part without brackets is considered as fixed SQL, which is output as it is without dynamic concatenation.
@@ -26,7 +25,7 @@ This tool is mainly designed to facilitate the configuration of dynamic WHERE st
 ### Installation dependency
 
 Added in lein dependency:
-`[org.to.victory.db/hugwhere "0.3.0"]`
+`[org.tovictory.db/hugwhere "0.3.1"]`
 
 ### Initialize hugwhere in the code
 

@@ -1,5 +1,5 @@
-(ns org.to.victory.db.hack-hugsql-test
-  (:require [org.to.victory.db.hack-hugsql :as sut]
+(ns org.tovictory.db.hack-hugsql-test
+  (:require [org.tovictory.db.hack-hugsql :as sut]
             [clojure.test :refer :all]
             [hugsql.core :as hs]
             [clojure.string :as str]))

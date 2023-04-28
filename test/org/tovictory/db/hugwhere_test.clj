@@ -1,6 +1,6 @@
-(ns org.to.victory.db.hugwhere-test
+(ns org.tovictory.db.hugwhere-test
   (:require [clojure.test :refer :all]
-            [org.to.victory.db.hugwhere :refer :all]))
+            [org.tovictory.db.hugwhere :refer :all]))
 
 (deftest test-default-dynamic
   (testing "keep constant condition"

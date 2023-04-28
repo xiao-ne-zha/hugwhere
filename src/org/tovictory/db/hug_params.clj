@@ -1,6 +1,5 @@
-(ns org.to.victory.db.hug-params
-  (:require  [clojure.string :as str]
-             [hugsql.parameters :as hp :refer [apply-hugsql-param]]))
+(ns org.tovictory.db.hug-params
+  (:require [hugsql.parameters :as hp :refer [apply-hugsql-param]]))
 
 (defprotocol LikeValueParam
   (like-value-param [param data options]))
@@ -13,15 +12,15 @@
 
 (extend-type Object
   LikeValueParam
-  (like-value-param [param data options]
+  (like-value-param [param data _]
     ["?" (str \% (get-in data (hp/deep-get-vec (:name param))) \%)])
 
   LeftLikeValueParam
-  (left-like-value-param [param data options]
+  (left-like-value-param [param data _]
     ["?" (str (get-in data (hp/deep-get-vec (:name param))) \%)])
 
   RightLikeValueParam
-  (right-like-value-param [param data options]
+  (right-like-value-param [param data _]
     ["?" (str \% (get-in data (hp/deep-get-vec (:name param))))]))
 
 (defmethod apply-hugsql-param :like [param data options] (like-value-param param data options))

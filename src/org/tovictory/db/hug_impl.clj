@@ -1,11 +1,10 @@
-(ns org.to.victory.db.hug-impl
+(ns org.tovictory.db.hug-impl
   (:require  [clojure.string :as str]
              [instaparse.core :refer [defparser] :as insta]
              [clojure.core.cache :as cache]
              [clojure.java.io :as io]
              [hugsql.parameters :as hp]))
 
-;;(def REGEX-KID #"(:[-\w]+\*?)?:[-\w]+(\.[-\w]+)*")
 (def REGEX-KID #"((?<!\\):[-\w]+\*?)?(?<!\\):[-\w]+(\.[-\w]+)*")
 (defparser ^:private hwp (slurp (io/resource "hugwhere.bnf")) :auto-whitespace :standard)
 (def where-parser (memoize hwp))

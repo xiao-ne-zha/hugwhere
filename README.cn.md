@@ -10,7 +10,7 @@
     * 5.1 中间像: `:like:value` 或 简写 `:l:value`, 会将传入的`value`转变为 `%value%` 形式
     * 5.2 左边像: `:left-like:value` 或简写 `:ll:value`, 会将传入的`value`转变为 `value%` 形式
     * 5.3 右边像: `:right-like:value` 或简写 `:rl:value`, 会将传入的`value`转变为 `%value` 形式
-  * 6. 最新的0.3.0 版本增加了没有`where`开头的条件部分的动态拼接
+  * 6. 没有`where`开头的条件部分的也可以动态拼接
 
 注意：动态部分，主要靠双[[ ]]中括号来确定，中括号的使用规则如下，可以参见sql文件中使用的例子进行理解。
   * 1. 无中括号包括的部分，认为是固定sql，保留原样输出，不做动态拼接
@@ -29,7 +29,7 @@ lein依赖中添加：`[org.to.victory.db/hugwhere "0.3.0"]`
 
 在你的系统第一次访问数据库前，调用下面的代码（或者一个较好的实践是系统初始化阶段调用）
 
-    (require '[org.to.victory.db.hack-hugsql :as hh])
+    (require '[org.tovictory.db.hack-hugsql :as hh])
     (hh/hack-hugsql)
 
 
