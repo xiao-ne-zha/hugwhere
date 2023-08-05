@@ -10,7 +10,7 @@
         sql (if dynamic-where
               (mapv #(if (vector? %)
                        (let [[s e] %]
-                         (if (and (= :end e) (or (str/starts-with? s "[") (str/starts-with? s "where ")))
+                         (if (and (= :end e) (or (str/starts-with? s "[[") (str/starts-with? s "where ")))
                            [(format "(where params \"%s\")" s) :end]
                            %))
                        %)
