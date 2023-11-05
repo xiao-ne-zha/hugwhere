@@ -9,8 +9,9 @@
         req (if dynamic-where (conj req "[org.tovictory.db.hugwhere :refer [where]]") req)
         sql (if dynamic-where
               (mapv #(if (vector? %)
-                       (let [[s e] %]
-                         (if (and (= :end e) (or (str/starts-with? s "[[") (str/starts-with? s "where ")))
+                       (let [[s e] %
+                             s (str/triml s)]
+                         (if (and (= :end e) (not= \( (first s)))
                            [(format "(where params \"%s\")" s) :end]
                            %))
                        %)

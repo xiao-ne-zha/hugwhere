@@ -19,10 +19,7 @@
          para-name (if (= 1 (count parameter)) (first parameter) (second parameter))
          para-str (if (= 1 (count parameter)) (str ":" para-name) (str ":" para-type ":" para-name))]
      (let [para-key-vec (-> para-name keyword hp/deep-get-vec)]
-       (when (get-in params para-key-vec) para-str)))))
-
-(defn xf-other [[_ & elements]]
-  (str/join \space elements))
+       (when-not (nil? (get-in params para-key-vec)) para-str)))))
 
 (defn xf-block
   "根据参数中值的情况，转换得到块的结果。
@@ -32,10 +29,9 @@
   [[_ & elements] params]
   (let [snippets (map (fn [[tp :as ast]]
                         (case tp
-                          :other [:o (xf-other ast)]
                           :parameter [:p (xf-parameter ast params)]
                           :block [:b (xf-block ast params)]
-                          nil))
+                          ast))
                       elements)
         para-snps (->> snippets (filter #(= :p (first %))) (map second))
         block-snps (->> snippets (filter #(= :b (first %))) (map second))]
@@ -54,12 +50,12 @@
 
 (defn xf-statement
   "每个元素均做转换拼接"
-  [[_ & elements] params]
-  (str/join \space
-            (map (fn [[tp :as ast]]
-                   (case tp
-                     :other (xf-other ast)
-                     :parameter (xf-parameter ast)
-                     :block (xf-block ast params)
-                     nil))
-                 elements)))
+  [params sql]
+  (when-let [[_ & elements] (parser sql)]
+    (str/join \space
+              (map (fn [[tp :as ast]]
+                     (case tp
+                       :parameter (xf-parameter ast)
+                       :block (xf-block ast params)
+                       (second ast)))
+                   elements))))

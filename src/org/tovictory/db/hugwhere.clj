@@ -1,5 +1,8 @@
 (ns org.tovictory.db.hugwhere
-  (:require [org.tovictory.db.hug-impl :refer [to-sql]]))
+  (:require [org.tovictory.db.parablock :refer [xf-statement]]))
 
-(defn where [params where-clause]
-  (to-sql params where-clause))
+(defn where [params sql]
+  (let [result (xf-statement params sql)]
+    (if (empty? result)
+      nil
+      result)))

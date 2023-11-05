@@ -1,11 +1,10 @@
 statement = (other | parameter | block)+
 block = <'{'> (other | parameter | block)+ <'}'>
-other = element+
-<element> = STR | ANY+
+other = (STR | ANY)
 parameter = (PARA_TYPE PARA_NAME) / PARA_NAME
 <PARA_TYPE> = <':'> #"[A-Za-z-]+\*?"
 <PARA_NAME> = <':'> #"[-\w]+(\.[-\w]+)*"
 <STR> = SQUOTA_STR | DQUOTA_STR
 <DQUOTA_STR> = #'"([^"]|((?<=\\)")|(""))+"'
 <SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))+'"
-<ANY> = #'[^\'"\s:{]\S*'
+<ANY> = #'[^\'"\s:{][^\s}]*' | #'::[^\s}]+'

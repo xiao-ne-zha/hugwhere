@@ -1,73 +1,75 @@
 # hugwhere
- Like sql => like hugsql => like hugwhere, yes, you do!
-中文说明请参看 [README.cn](https://github.com/xiao-ne-zha/hugwhere/blob/master/README.cn.md)
+我想如果你喜欢用sql访问数据库，你会喜欢使用[hugsql](https://www.hugsql.org/),那么你一定会喜欢用hugwhere来省去拼写动态where条件的繁琐。
 
-This tool is mainly designed to facilitate the configuration of dynamic WHERE statements in HugSQL. Its main features include:
+该工具主要是方便配置hugsql的动态where语句。主要功能有
+  * 1.根据参数中非nil值，动态拼接where语句，丢弃其中nil值参数相关的sql片段。如`where a = :a { or b like :b }` 在参数:b为nil时，输出`where a = :a`
+  * 2.默认保留无变参部分的sql片段。如`where a=1 { and b = :b }` 在参数:b为nil时，输出结果为`where a=1`
+  * 3.可以强制随变参存在或消失的sql片段。如`{where a=1 and b = :b }` 在参数:b为nil时，输出结果为nil
+  * 4.增加了三种用于like的值语法，感谢hugsql的设计，当你依赖了本库就可以直接在sql文件中使用着三种语法。这三种分别是
+    * 4.1 中间像: `:like:value` 或 简写 `:l:value`, 会将传入的`value`转变为 `%value%` 形式
+    * 4.2 左边像: `:left-like:value` 或简写 `:ll:value`, 会将传入的`value`转变为 `value%` 形式
+    * 4.3 右边像: `:right-like:value` 或简写 `:rl:value`, 会将传入的`value`转变为 `%value` 形式
 
-* 1. Dynamically concatenating WHERE statements based on non-nil parameters, discarding SQL fragments related to nil values. For example, where a = :a [[ or b like :b ]] will output where a = :a when the parameter b is nil.
-* 2. By default, preserving SQL fragments without variable parts. For example, where a=1 [[ and b = :b ]] will output where a=1 when the parameter b is nil.
-* 3. Forcing SQL fragments to be present or absent depending on the presence of variable parts. For example, where [[ a=1 and b = :b ]] will output nil when the parameter b is nil.
-* 4. Supporting the use of functions within WHERE statements. Note that if the function uses a parameter, it should be separated from :x by spaces.
-* 5. Adding three syntax options for the LIKE operator. Thanks to HugSQL's design, you can use these three syntax options directly in your SQL files once you've depended on this library. The three options are:
-   *  5.1 Middle match: :like:value or abbreviated as :l:value. This will convert the passed-in value to the form %value%.
-   *  5.2 Left match: :left-like:value or abbreviated as :ll:value. This will convert the passed-in value to the form value%.
-   *  5.3 Right match: :right-like:value or abbreviated as :rl:value. This will convert the passed-in value to the form %value.
+注意：动态部分，主要靠双{ }大括号来确定，大括号的使用规则如下，可以参见sql文件中使用的例子进行理解。
+  * 1. 无大括号包括的部分，认为是固定sql，保留原样输出，不做动态拼接
+  * 2. 大括号内的关键字参数 :x , 前面需有空格隔开。大括号内的关键字参数为大括号内sql片段的直接依赖。当直接依赖的参数有一个未提供值时，大括内的sql片段全部丢弃
+  * 3. 大括号内可以嵌套大括号。 嵌套的大括号作为间接依赖。当一个大括号内部，仅仅有间接依赖时，间接依赖全部为空，就丢弃大括号内的sql片段。否则，拼接大括内的sql片段。
+  * 4. 大括号前后可以没有空格。
 
-**Note: The dynamic part of the tool mainly relies on the double [[ ]] brackets to determine. The usage rules of brackets are as follows, which can be understood by referring to the examples used in the SQL file.**
-* The part without brackets is considered as fixed SQL, which is output as it is without dynamic concatenation.
-* The keyword parameter :x in the brackets must be separated by spaces before and after. The keyword parameters in the brackets are directly dependent on the SQL fragments in the brackets. When all the directly dependent parameters are not provided, all the SQL fragments in the brackets are discarded.
-* The brackets can be nested in the brackets. The nested brackets are indirect dependencies. When there are only indirect dependencies inside a bracket, and all the indirect dependencies are empty, the SQL fragments inside the brackets are discarded. Otherwise, concatenate the SQL fragments inside the brackets.
-* There should be spaces before and after the double brackets.
-* The double brackets were changed from single brackets to avoid conflicts with the parentheses separators in SQL. Even so, to avoid conflicts with the double brackets, it is best to add spaces between consecutive single brackets in the SQL.
+## 重要说明
+该1.0.0版本是语法层面最终版本，以后只会修复bug.不再做语法上面的调整。
+本次重大调整是将参数块的分隔符由 双中括号 `[[` `]]` 改为 `{` `}`, 主要原因是发现大括号在一般的sql语句中被使用的更少。特别是postgresql中，中括号在数组类型中很常用，但是大括号可以放心使用。
 
-## Usage
+## 使用方法
 
-### Installation dependency
+### 安装依赖
 
-Added in lein dependency:
-`[org.tovictory.db/hugwhere "0.3.1"]`
+lein依赖中添加：`[org.to.victory.db/hugwhere "1.0.0"]`
 
-### Initialize hugwhere in the code
+### 在代码中初始化hugwhere
 
-    (require '[org.to.victory.db.hack-hugsql :as hh])
+在你的系统第一次访问数据库前，调用下面的代码（或者一个较好的实践是系统初始化阶段调用）
+
+    (require '[org.tovictory.db.hack-hugsql :as hh])
     (hh/hack-hugsql)
 
-### Use in sql file
-For example write your function in resources/xxx.sql.
-  * Note: the `:D` is the key of hugwhere, and you can see the trick in the following: --~ where ... or /*~ where ... ~*/
+
+### 在sql文件中的使用
+按hugsql约定，在resources/xxx.sql里面写明你的函数，下面是几个例子
+注意在 :name 行的最后增加 :D 是打开动态where的开关。 而 --~ where ... 是单行动态where的写法， /*~ where ... ~*/ 是多行动态where的写法
 
 ```clojure
 -- :name test1 :? :* :D
 select * from users
---~ where a = 100 [[ and b = :b ]] [[ or c like :c ]]
+--~ where a = 100 { and b = :b } { or c like :c }
 
 -- :name list-users :? :* :D
 select * from users
---~ where [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1
+--~ where { id = :id and } { name like :l:name and } is_valid = 1
 
 -- :name test2 :? :* :D
 select * from users
---~ where [[ a = 100 [[ and b = :b ]] [[ or c like :c ]] ]]
+--~ where { a = 100 { and b = :b } { or c like :c } }
 
 -- :name list-users2 :? :* :D
 select * from users
---~ where [[ [[ id = :id and ]] [[ name like :l:name and ]] is_valid = 1 ]]
+--~ where { { id = :id and } { name like :l:name and } is_valid = 1 }
 
 -- :name test-influence :? :* :D
 select * from users
---~ where a = 1 [[ and b like :ll:b and c = 1 ]] [[ and d = :d and e != 0 ]]
+--~ where a = 1 { and b like :ll:b and c = 1 } { and d = :d and e != 0 }
 
 -- :name test-func :? :* :D
 select * from users
---~ where a = 1 [[ and b = f( :b ,1) ]] [[ and c = fs( :c , :d ) ]]
+--~ where a = 1 { and b = f( :b ,1) } { and c = fs( :c , :d ) }
 ```
 
-### Use hugsql api to create these functions
-For example , I use the def-sqlvec-fns
+### 根据上述文件生成数据库访问函数
+这里为了方便说明问题，采用hugsql的def-sqlvec-fns来生成sql语句函数。正常项目中，应该主要用的是def-db-fns来生成
 
     (hugsql.core/def-sqlvec-fns "xxx.sql")
 
-### Then you can test the flowing in repl:
+### 然后你就可以在repl里面测试一下内容了
 
 ```clojure
 (test1-sqlvec nil) =>
