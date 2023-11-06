@@ -7,4 +7,4 @@ parameter = (PARA_TYPE PARA_NAME) / PARA_NAME
 <STR> = SQUOTA_STR | DQUOTA_STR
 <DQUOTA_STR> = #'"([^"]|((?<=\\)")|(""))+"'
 <SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))+'"
-<ANY> = #'[^\'"\s:{][^\s}]*' | #'::[^\s}]+'
+<ANY> = #'[^\'"\s:{][^\s{}]*' | #'::[^\s{}]+'
