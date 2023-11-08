@@ -1,4 +1,4 @@
-(defproject org.clojars.xiao-ne-zha/hugwhere "1.0.0"
+(defproject org.clojars.xiao-ne-zha/hugwhere "1.0.1"
   :description "dynamic `where conditions` when you use hugsql to create your function that access database
 当你使用hugsql来编写数据库访问函数时，该库可以让你省去编写动态拼接where条件的繁琐"
   :url "https://github.com/xiao-ne-zha/hugwhere"
@@ -9,8 +9,6 @@
                  [instaparse "1.4.12"]
                  [org.clojure/core.cache "1.0.225"]
                  [robert/hooke "1.3.0"]]
-  :deploy-repositories [["releases" {:url "https://repo.clojars.org"
-                                     :sign-releases false
-                                     :username "xiao-ne-zha"}]
+  :deploy-repositories [["releases" {:url "https://repo.clojars.org"}]
                         ["snapshots" :clojars]]
   :repl-options {:init-ns org.tovitory.db.hugwhere})
