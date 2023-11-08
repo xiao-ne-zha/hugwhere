@@ -6,7 +6,7 @@
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [migratus "1.2.4"]
                  [conman "0.9.4"]
-                 [org.tovictory.db/hugwhere "1.0.0"]
+                 [org.clojars.xiao-ne-zha/hugwhere "1.0.0"]
                  [com.h2database/h2 "1.4.193"]
                  [ch.qos.logback/logback-classic "1.2.3"]
                  [mount "0.1.16"]]
