@@ -9,6 +9,8 @@
                  [instaparse "1.4.12"]
                  [org.clojure/core.cache "1.0.225"]
                  [robert/hooke "1.3.0"]]
-  :deploy-repositories [["releases" :clojars]
+  :deploy-repositories [["releases" {:url "https://repo.clojars.org"
+                                     :sign-releases false
+                                     :username "xiao-ne-zha"}]
                         ["snapshots" :clojars]]
   :repl-options {:init-ns org.tovitory.db.hugwhere})

@@ -1,10 +1,14 @@
+(* 该语言的一个语句为任意多个参数(parameter)、块(block)和其他元素(other)的组合 *)
 statement = (other | parameter | block)+
+(* block 是由 `{}`包围的 任意多个参数(parameter)、块(block)和其他元素(other)的组合 *)
 block = <'{'> (other | parameter | block)+ <'}'>
-other = (STR | ANY)
+(* 参数是指hugsql中所允许的参数形式，即 `:`开始的形式。复杂形式参考hugsql的文档。 *)
 parameter = (PARA_TYPE PARA_NAME) / PARA_NAME
 <PARA_TYPE> = <':'> #"[A-Za-z-]+\*?"
 <PARA_NAME> = <':'> #"[-\w]+(\.[-\w]+)*"
+(* 其他元素是指字符串或其它非字符串、非参数、非block开始结束符的元素的组合 *)
+other = (STR | ANY)
 <STR> = SQUOTA_STR | DQUOTA_STR
 <DQUOTA_STR> = #'"([^"]|((?<=\\)")|(""))+"'
 <SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))+'"
-<ANY> = #'[^\'"\s:{][^\s{}]*' | #'::[^\s{}]+'
+<ANY> = #'([^\'"{:]|::)([^\'"{}:]|((?<=\\):))*'

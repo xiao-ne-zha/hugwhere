@@ -5,10 +5,7 @@
 
 (defn fmt-str [s]
   (when s
-    (let [s (str/replace s #"\s{2,}" " ")]
-      (if (= \space (last s))
-        (subs s 0 (dec (count s)))
-        s))))
+    (-> s (str/replace #"\s{2,}" " ") str/trim)))
 
 (deftest xf-statement-test
   (testing "normal sql"
