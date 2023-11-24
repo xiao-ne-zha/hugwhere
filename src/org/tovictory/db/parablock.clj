@@ -3,7 +3,6 @@
              [instaparse.core :refer [defparser] :as insta]
              [clojure.core.cache :as cache]
              [clojure.java.io :as io]
-             [clojure.walk :refer [postwalk]]
              [hugsql.parameters :as hp]))
 
 (defparser ^:private parser (slurp (io/resource "parablock.bnf")) :auto-whitespace :standard)
