@@ -9,6 +9,6 @@ parameter = (PARA_TYPE PARA_NAME) / PARA_NAME
 (* 其他元素是指字符串或其它非字符串、非参数、非block开始结束符的元素的组合 *)
 other = (STR | ANY)
 <STR> = SQUOTA_STR | DQUOTA_STR
-<DQUOTA_STR> = #'"([^"]|((?<=\\)")|(""))+"'
-<SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))+'"
+<DQUOTA_STR> = #'"([^"]|((?<=\\)")|(""))*"'
+<SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))*'"
 <ANY> = #'([^\'"{:]|::)([^\'"{}:]|((?<=\\):))*'
