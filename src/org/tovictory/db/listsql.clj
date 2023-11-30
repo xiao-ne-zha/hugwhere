@@ -31,6 +31,9 @@
   (parser "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1 and {a = :a}}")
   (parser "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1\n and {a = :a}}")
   (parser "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1\n--comment\n and {a = :a}}")
+(parser "-- :name test-expr\n--comment\n(let [s1 \"select * from table-a\"] (str s1 (when (:name params) \" where ddd\")))")
   (listsql->hugsql "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1 and {a = :a}}")
   (listsql->hugsql "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1\n and {a = :a}}")
-  (listsql->hugsql "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1\n--comment\n and {a = :a}}"))
+(listsql->hugsql "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1\n--comment\n and {a = :a}}")
+;; 复杂的where条件，可以写成clojure语言来组织字符串
+(listsql->hugsql "-- :name test-expr\n--comment\n(let [s1 \"select * from table-a\"] (str s1 (when (:name params) \" where ddd\")))"))
