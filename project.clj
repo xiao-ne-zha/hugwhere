@@ -7,6 +7,7 @@
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [com.layerware/hugsql "0.5.3"]
                  [instaparse "1.4.12"]
+                 [org.clojure/tools.logging "1.2.4"]
                  [org.clojure/core.cache "1.0.225"]
                  [robert/hooke "1.3.0"]]
   :deploy-repositories [["releases" {:url "https://repo.clojars.org"}]

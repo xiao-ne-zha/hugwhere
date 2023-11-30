@@ -2,6 +2,7 @@
   (:require  [clojure.string :as str]
              [instaparse.core :refer [defparser] :as insta]
              [clojure.core.cache :as cache]
+             [clojure.tools.logging :as log]
              [clojure.java.io :as io]
              [hugsql.parameters :as hp]))
 
@@ -50,11 +51,14 @@
 (defn xf-statement
   "每个元素均做转换拼接"
   [params sql]
-  (when-let [[_ & elements] (parser sql)]
-    (str/join \space
-              (map (fn [[tp :as ast]]
-                     (case tp
-                       :parameter (xf-parameter ast)
-                       :block (xf-block ast params)
-                       (second ast)))
-                   elements))))
+  (let [result (parser sql)]
+    (if (insta/failure? result)
+      (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
+      (str/join \space
+                (map (fn [[tp :as ast]]
+                       (case tp
+                         ;; 此时不在块内，所以不能传参数
+                         :parameter (xf-parameter ast)
+                         :block (xf-block ast params)
+                         (second ast)))
+                     (rest result))))))
