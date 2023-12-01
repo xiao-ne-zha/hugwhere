@@ -3,6 +3,7 @@
              [instaparse.core :refer [defparser] :as insta]
              [clojure.core.cache :as cache]
              [clojure.java.io :as io]
+             [clojure.tools.logging :as log]
              [hugsql.parameters :as hp]))
 
 (defparser ^:private parser (slurp (io/resource "listsql.bnf")))
@@ -23,9 +24,10 @@
    :sqls make-sqls})
 
 (defn listsql->hugsql [ls]
-  (->> ls
-       parser
-       (insta/transform trfm-map)))
+  (let [result (parser ls)]
+    (if (insta/failure? result)
+      (log/error "parse listsql error, listsql is " ls "\nfailure info:\n" result)
+      (insta/transform trfm-map result))))
 
 (comment
   (parser "-- :name list-by-map \n-- comment content\nselect * from table-a {where 1 = 1 and {a = :a}}")
