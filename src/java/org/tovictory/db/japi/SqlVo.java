@@ -11,6 +11,15 @@ public class SqlVo {
         this.args = args;
     }
 
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("SqlVo{");
+        sb.append("sql='").append(sql).append('\'');
+        sb.append(", args=").append(args);
+        sb.append('}');
+        return sb.toString();
+    }
+
     public String getSql() {
         return sql;
     }

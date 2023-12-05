@@ -19,6 +19,6 @@
   :test-paths ["test/clj"]
   :resource-paths ["resources"]
   :target-path "target/%s/"
-  ;;:aot :all
-  ;;:omit-source true
+  :aot :all
+  :omit-source true
   :repl-options {:init-ns org.tovitory.db.hugwhere})
