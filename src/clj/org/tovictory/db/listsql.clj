@@ -10,8 +10,8 @@
             sqlid (if sqlid sqlid
                       (re-find #"(?<=\s:list\s+)\S+" line))]
         (str "-- :name " sqlid " :? :* :D"))
-      (re-matches #"--\s+:count\s+\S+\s*" line)
-      (let [sqlid (re-find #"(?<=--\s+:count\s+)\S+" line)]
+      (re-matches #"--\s+:row\s+\S+\s*" line)
+      (let [sqlid (re-find #"(?<=--\s+:row\s+)\S+" line)]
         (str "-- :name " sqlid " :? :1 :D"))
       (str/starts-with? line "{")
       (str "--~ " line)

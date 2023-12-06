@@ -39,7 +39,18 @@
     (->> files
          (filter sql-file?)
          (map load-sql-file)
-         (reduce merge))))
+         (apply merge))))
+
+(defn- load-cudsql-paths [^java.util.List paths]
+  (let [files (mapcat #(-> % io/file file-seq) paths)]
+    (->> files
+         (filter sql-file?)
+         (map (fn [file]
+                (let [fname (.getName file)
+                      table-name (subs fname 0 (- (count fname) 4))
+                      pf (partial cudsql->hugsql table-name)]
+                  (load-easy-sql-file pf file))))
+         (apply merge))))
 
 (defn- watch-sql-files [paths on-changes]
   (hawk/watch!
@@ -58,11 +69,15 @@
 
 (defn- -post-init [this ^java.util.List listsql-paths ^java.util.List cudsql-paths ^java.util.List nativesql-paths]
   (let [lfm (load-sql-paths listsql->hugsql listsql-paths)
-        cfm (load-sql-paths cudsql->hugsql cudsql-paths)
+        cfm (load-cudsql-paths cudsql-paths)
         nfm (load-sql-paths identity nativesql-paths)]
     (watch-sql-files [listsql-paths cudsql-paths nativesql-paths]
                       [#(swap! (.info this) merge (load-easy-sql-file listsql->hugsql %))
-                       #(swap! (.info this) merge (load-easy-sql-file cudsql->hugsql %))
+                       (fn [file]
+                         (let [fname (.getName file)
+                               table-name (subs fname 0 (- (count fname) 4))
+                               pf (partial cudsql->hugsql table-name)]
+                           (swap! (.info this) merge (load-easy-sql-file pf file))))
                        #(swap! (.info this) merge (load-easy-sql-file identity %))])
     (swap! (.info this) merge lfm cfm nfm)))
 
