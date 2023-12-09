@@ -1,46 +1,48 @@
 (ns org.tovictory.db.listsql
   (:require  [clojure.string :as str]))
 
-(defn xf-line [line]
-  (let [line (str/triml line)]
+(defn xf-header [prefix fname]
+  (let [sqlid (if (empty? prefix) fname (str prefix "-" fname))]
     (cond
-      ;; 默认:name 相当于:list
-      (re-matches #"--\s+:(name|list)\s+\S+\s*" line)
-      (let [sqlid (re-find #"(?<=\s:name\s+)\S+" line)
-            sqlid (if sqlid sqlid
-                      (re-find #"(?<=\s:list\s+)\S+" line))]
-        (str "-- :name " sqlid " :? :* :D"))
-      (re-matches #"--\s+:row\s+\S+\s*" line)
-      (let [sqlid (re-find #"(?<=--\s+:row\s+)\S+" line)]
-        (str "-- :name " sqlid " :? :1 :D"))
-      (str/starts-with? line "{")
-      (str "--~ " line)
+      (str/starts-with? fname "insert")
+      (str "-- :name " sqlid " :! :n :D")
+      (str/starts-with? fname "save")
+      (str "-- :name " sqlid " :! :n :D")
+      (str/starts-with? fname "update")
+      (str "-- :name " sqlid " :! :n :D")
+      (str/starts-with? fname "delete")
+      (str "-- :name " sqlid " :! :n :D")
+      (str/starts-with? fname "count")
+      (str "-- :name " sqlid " :? :1 :D")
+      (str/starts-with? fname "total")
+      (str "-- :name " sqlid " :? :1 :D")
       :else
-      line)))
+      (str "-- :name " sqlid " :? :* :D"))))
 
-(defn listsql->hugsql [ls]
-  (->> ls
-       str/split-lines
-       (map xf-line)
-       (str/join \newline)))
+(defn xf-line
+  ([line] (xf-line nil line))
+  ([prefix oline]
+   (let [line (str/triml oline)]
+     (cond
+       (re-matches #"--\s+:name\s+\S+\s*" line)
+       (let [sqlid (re-find #"(?<=\s:name\s+)\S+" line)]
+         (xf-header prefix sqlid))
+       (re-matches #"--\s+:row\s+\S+\s*" line)
+       (let [sqlid (re-find #"(?<=--\s+:row\s+)\S+" line)]
+         (str "-- :name " sqlid " :? :1 :D"))
+       (str/starts-with? line "{")
+       (str "--~ " line)
+       :else
+       oline))))
 
-(defn xf-line-cud [table-name line]
-  (let [line (str/trim line)]
-    (cond
-      (re-matches #"--\s+:(insert|update|delete)\b" line)
-      (let [action (re-find #"(?<=--\s+:)insert|update|delete(?=\s*)" line)]
-        (str "-- :name " action "-" table-name " :! :n :D"))
-      (str/starts-with? line "{")
-      (str "--~ " line)
-      :else
-      line)))
+(defn listsql->hugsql
+  ([ls] (listsql->hugsql nil ls))
+  ([prefix ls]
+   (->> ls
+        str/split-lines
+        (map (partial xf-line prefix))
+        (str/join \newline))))
 
-(defn cudsql->hugsql [table-name lines]
-  (let [xf (partial xf-line-cud table-name)]
-    (->> lines
-         str/split-lines
-         (map xf)
-         (str/join \newline))))
 
 (comment
   (listsql->hugsql "-- :name list-by-map \n-- comment content\nselect * from table-a\n {where 1 = 1 and {a = :a}}")

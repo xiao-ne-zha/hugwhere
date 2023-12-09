@@ -3,7 +3,7 @@
             [clojure.java.io :as io]
             [hawk.core :as hawk]
             [clojure.tools.logging :as log]
-            [org.tovictory.db.listsql :refer [listsql->hugsql cudsql->hugsql]]
+            [org.tovictory.db.listsql :refer [listsql->hugsql]]
             [hugsql.core :as hs])
   (:import [org.tovictory.db.japi SqlVo])
   (:gen-class :name org.tovictory.db.japi.SqlGetterImpl
@@ -28,7 +28,7 @@
     (try (let [hsql (->> file slurp pf)
                qt (hs/map-of-sqlvec-fns-from-string hsql)]
            (when-not (empty? qt)
-             (log/info "高级查询配置文件" filename "分析完成")
+             (log/debug "高级查询配置文件" filename "分析完成")
              qt))
          (catch Exception e
            (log/warn "高级查询配置文件" filename "分析失败，错误原因：" (.getMessage e))))))
@@ -41,14 +41,14 @@
          (map load-sql-file)
          (apply merge))))
 
-(defn- load-cudsql-paths [^java.util.List paths]
+(defn- load-entitysql-paths [^java.util.List paths]
   (let [files (mapcat #(-> % io/file file-seq) paths)]
     (->> files
          (filter sql-file?)
          (map (fn [file]
                 (let [fname (.getName file)
                       table-name (subs fname 0 (- (count fname) 4))
-                      pf (partial cudsql->hugsql table-name)]
+                      pf (partial listsql->hugsql table-name)]
                   (load-easy-sql-file pf file))))
          (apply merge))))
 
@@ -64,19 +64,19 @@
                        ctx)})
          paths on-changes)))
 
-(defn- -init [^java.util.List listsql-paths ^java.util.List cudsql-paths ^java.util.List nativesql-paths]
+(defn- -init [^java.util.List listsql-paths ^java.util.List entitysql-paths ^java.util.List nativesql-paths]
   [[] (atom {})])
 
-(defn- -post-init [this ^java.util.List listsql-paths ^java.util.List cudsql-paths ^java.util.List nativesql-paths]
+(defn- -post-init [this ^java.util.List listsql-paths ^java.util.List entitysql-paths ^java.util.List nativesql-paths]
   (let [lfm (load-sql-paths listsql->hugsql listsql-paths)
-        cfm (load-cudsql-paths cudsql-paths)
+        cfm (load-entitysql-paths entitysql-paths)
         nfm (load-sql-paths identity nativesql-paths)]
-    (watch-sql-files [listsql-paths cudsql-paths nativesql-paths]
+    (watch-sql-files [listsql-paths entitysql-paths nativesql-paths]
                       [#(swap! (.info this) merge (load-easy-sql-file listsql->hugsql %))
                        (fn [file]
                          (let [fname (.getName file)
                                table-name (subs fname 0 (- (count fname) 4))
-                               pf (partial cudsql->hugsql table-name)]
+                               pf (partial listsql->hugsql table-name)]
                            (swap! (.info this) merge (load-easy-sql-file pf file))))
                        #(swap! (.info this) merge (load-easy-sql-file identity %))])
     (swap! (.info this) merge lfm cfm nfm)))

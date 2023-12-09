@@ -1,4 +1,4 @@
-(defproject org.clojars.xiao-ne-zha/hugwhere "1.1.2-SNAPSHOT"
+(defproject org.clojars.xiao-ne-zha/hugwhere "1.1.3-SNAPSHOT"
   :description "dynamic `where conditions` when you use hugsql to create your function that access database
 当你使用hugsql来编写数据库访问函数时，该库可以让你省去编写动态拼接where条件的繁琐"
   :url "https://github.com/xiao-ne-zha/hugwhere"
