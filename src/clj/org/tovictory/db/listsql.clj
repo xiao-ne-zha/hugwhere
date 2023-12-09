@@ -12,6 +12,8 @@
       (str "-- :name " sqlid " :! :n :D")
       (str/starts-with? fname "delete")
       (str "-- :name " sqlid " :! :n :D")
+      (str/starts-with? fname "detail")
+      (str "-- :name " sqlid " :? :1 :D")
       (str/starts-with? fname "count")
       (str "-- :name " sqlid " :? :1 :D")
       (str/starts-with? fname "total")
@@ -27,9 +29,6 @@
        (re-matches #"--\s+:name\s+\S+\s*" line)
        (let [sqlid (re-find #"(?<=\s:name\s+)\S+" line)]
          (xf-header prefix sqlid))
-       (re-matches #"--\s+:row\s+\S+\s*" line)
-       (let [sqlid (re-find #"(?<=--\s+:row\s+)\S+" line)]
-         (str "-- :name " sqlid " :? :1 :D"))
        (str/starts-with? line "{")
        (str "--~ " line)
        :else
