@@ -89,8 +89,10 @@
         (SqlVo. sql args)))))
 
 (comment
-  (def sg (SqlGetterImpl. ["/media/zszhang/Data/workspaces/tydicgit/bsaids/sysmng/sql"]))
-  (doseq [p [nil {"dept_id" 108}]]
+  (def sg (SqlGetterImpl. ["/media/zszhang/Data/workspaces/tydicgit/bsaids/sysmng/sql/listsql"]
+                          ["/media/zszhang/Data/workspaces/tydicgit/bsaids/sysmng/sql/pages"]
+                          ["/media/zszhang/Data/workspaces/tydicgit/bsaids/sysmng/sql/hugsql"])
+  doseq [p [nil {"dept_id" 108}]]
     (let [sv (.getSql sg "test-select-dept" p)]
       (println {:sql (.getSql sv)
                 :args (.getArgs sv)}))))
