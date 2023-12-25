@@ -6,7 +6,7 @@
 
 (defn- hack-pdef [{sql :sql {req :require nm :name} :hdr :as pdef}]
   (let [dynamic-where (= ":D" (last nm))
-        req (if dynamic-where (conj req "[org.tovictory.db.hugwhere :refer [where]]") req)
+        req (if dynamic-where (conj req "[org.tovictory.db.hugwhere :refer [where order-by]]") req)
         sql (if dynamic-where
               (mapv #(if (vector? %)
                        (let [[s e] %

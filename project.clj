@@ -9,6 +9,7 @@
                  [instaparse "1.4.12"]
                  [org.clojure/tools.logging "1.2.4"]
                  [org.clojure/core.cache "1.0.225"]
+                 [camel-snake-kebab "0.4.3"]
                  [hawk/hawk "0.2.11"]
                  [robert/hooke "1.3.0"]]
   :deploy-repositories [["releases" {:url "https://repo.clojars.org"}]
@@ -21,4 +22,4 @@
   :target-path "target/%s/"
   :aot :all
   :omit-source true
-  :repl-options {:init-ns org.tovitory.db.hugwhere})
+  :repl-options {:init-ns org.tovictory.db.hugwhere})
