@@ -48,17 +48,18 @@
            (str/join \space))
       )))
 
+(defn- xf-ast [params [tp :as ast]]
+  (case tp
+    ;; 此时不在块内，所以不能传参数
+    :parameter (xf-parameter ast)
+    :block (xf-block ast params)
+    (second ast)))
+
 (defn xf-statement
   "每个元素均做转换拼接"
   [params sql]
   (let [result (parser sql)]
     (if (insta/failure? result)
       (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
-      (str/join \space
-                (map (fn [[tp :as ast]]
-                       (case tp
-                         ;; 此时不在块内，所以不能传参数
-                         :parameter (xf-parameter ast)
-                         :block (xf-block ast params)
-                         (second ast)))
-                     (rest result))))))
+      (let [f (partial xf-ast params)]
+        (->> result rest (map f) (filter identity) (str/join \space))))))

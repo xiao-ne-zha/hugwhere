@@ -15,12 +15,12 @@
   ([order-by-key params options]
    (when-let [obs (get params order-by-key)]
      (let [obs (if (string? obs) [obs] obs)
-           obs (map #(if (vector? %) % [%]) obs)
+           obs (map #(if (or (string? %) (keyword? %)) [%] %) obs)
            obs (map (fn [[col asc]]
                       (let [asc (when (string? asc) (str/lower-case asc))
                             asc (#{"asc" "desc"} asc)
                             col (-> col name csk/->snake_case)]
-                        (str (identifier-param-quote (name col) options) \space asc)))
+                        (str (identifier-param-quote col options) \space asc)))
                     obs)]
        (str "order by " (str/join "," obs))))))
 
