@@ -1,14 +1,19 @@
 (ns org.tovictory.db.hugwhere
-  (:require [org.tovictory.db.parablock :refer [xf-statement]]
+  (:require [org.tovictory.db.parablock :refer [xf-statement] :as pb]
             [clojure.string :as str]
             [camel-snake-kebab.core :as csk]
-            [hugsql.parameters :refer [identifier-param-quote]]))
+            [hugsql.parameters :refer [identifier-param-quote] :as hp]))
 
-(defn where [params sql]
-  (let [result (xf-statement params sql)]
-    (if (empty? result)
-      nil
-      result)))
+(def not-nil? pb/not-nil?)
+(def contain-para-name? pb/contain-para-name?)
+
+(defn smart-block
+  ([params sql] (smart-block params nil sql))
+  ([params options sql]
+   (let [result (xf-statement params options sql)]
+     (if (empty? result)
+       nil
+       result))))
 
 (defn order-by-fn
   ([order-by-key params] (order-by-fn order-by-key params {:quoting :ansi}))

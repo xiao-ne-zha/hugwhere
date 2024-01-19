@@ -1,8 +1,9 @@
 (ns org.tovictory.db.hack-hugsql-test
-  (:require [org.tovictory.db.hack-hugsql :as sut]
+  (:require [org.tovictory.db.hug-params] ;; 引入此命名空间主要是为了使like参数生效
             [clojure.test :refer :all]
             [org.tovictory.db.parablock-test :refer [fmt-str]]
             [hugsql.core :as hs]
+            [org.tovictory.db.easysql :refer [easysql->hugsql]]
             [clojure.string :as str]))
 
 (def dbfn-sql
@@ -15,16 +16,21 @@
    ["test-func2" "where a = 1 { and b = f(f2( :b ),1) }"]])
 
 (defn- sql-fn-str [[fn-name where]]
-  (str "-- :name " fn-name " :? :* :D\nselect * from users\n--~ " where))
+  (easysql->hugsql (str "-- :name " fn-name " :? :* :D\nselect * from users\n--$" where
+                        "\n-- :name " fn-name "-keep-null :? :* :D\nselect * from users\n--@" where)))
 
 (defn fmt-sqlvec [sqlvec]
   (let [[sql & vs] sqlvec]
     (concat [(fmt-str sql)] vs)))
 
-(sut/hack-hugsql)
-(->> (map sql-fn-str dbfn-sql)
+;;(sut/hack-hugsql)
+#_(->> (map sql-fn-str dbfn-sql)
      (str/join "\n")
      hs/def-sqlvec-fns-from-string)
+(hs/def-sqlvec-fns-from-string
+  (str/join "\n"
+            (map sql-fn-str dbfn-sql))
+  {:require-str "[org.tovictory.db.hugwhere :refer [smart-block order-by not-nil? contain-para-name?]]"})
 
 (defn- iare2 [[_ [f]] p r]
   (str (list f p) " => " r))
@@ -39,11 +45,31 @@
     (are [params sqls]
         (= (fmt-sqlvec (test-func-sqlvec params)) sqls)
       nil ["select * from users\nwhere a = 1"]
+      {:b nil} ["select * from users\nwhere a = 1"]
       {:b "name"} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
       ;;{:c 100} ["select * from users\nwhere a = 1"] 报错，此处要求c、d必须同时提供，大部分函数也不支持变参
       {:c 100, :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]
       ;;{:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
       {:b nil :c 100 :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]))
+  (testing "cascade function"
+    (are [params sqls]
+        (= (fmt-sqlvec (test-func2-sqlvec params)) sqls)
+      nil ["select * from users\nwhere a = 1"]
+      {:b nil} ["select * from users\nwhere a = 1"]
+      {:b 1} ["select * from users\nwhere a = 1 and b = f(f2( ? ),1)" 1]
+      {:b false} ["select * from users\nwhere a = 1 and b = f(f2( ? ),1)" false])))
+
+(deftest test-use-func-keep-null
+  (testing "simple function"
+    (are [params sqls]
+        (= (fmt-sqlvec (test-func-keep-null-sqlvec params)) sqls)
+      nil ["select * from users\nwhere a = 1"]
+      {:b nil} ["select * from users\nwhere a = 1 and b = f( ? ,1)" nil]
+      {:b "name"} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
+      ;;{:c 100} ["select * from users\nwhere a = 1"] 报错，此处要求c、d必须同时提供，大部分函数也不支持变参
+      {:c 100, :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]
+      ;;{:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+      {:b nil :c 100 :d 1} ["select * from users\nwhere a = 1 and b = f( ? ,1) and c = fs( ? , ? )" nil 100 1]))
   (testing "cascade function"
     (are [params sqls]
         (= (fmt-sqlvec (test-func2-sqlvec params)) sqls)

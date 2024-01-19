@@ -1,5 +1,5 @@
 (ns org.tovictory.db.japi
-  (:require [org.tovictory.db.hack-hugsql :refer [hack-hugsql]]
+  (:require [org.tovictory.db.hug-params] ;; 引入此命名空间主要是为了使like参数生效
             [clojure.java.io :as io]
             [hawk.core :as hawk]
             [clojure.tools.logging :as log]
@@ -13,7 +13,6 @@
               :constructors {[java.util.List java.util.List java.util.List] []}
               :state info))
 
-(hack-hugsql)
 (import 'org.tovictory.db.japi.SqlHelperImpl)
 
 (defn- sql-file?
@@ -26,7 +25,7 @@
 (defn- load-easy-sql-file [pf file]
   (let [filename (.getName file)]
     (try (let [hsql (->> file slurp pf)
-               qt (hs/map-of-sqlvec-fns-from-string hsql)]
+               qt (hs/map-of-sqlvec-fns-from-string hsql {:require-str "[org.tovictory.db.hugwhere :refer [smart-block order-by not-nil? contain-para-name?]]"})]
            (when-not (empty? qt)
              (log/debug "高级查询配置文件" filename "分析完成")
              qt))

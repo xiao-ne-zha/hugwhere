@@ -6,13 +6,49 @@
 ## 查询sql文件配置约定
 对查询所用的sql语句配置文件做如下约定, 依据命名的含义确定：
 
-*1. 大括号 `{` 开头的行， 翻译为 `--~ {` 开头的行， 表示此行为动态sql行，需要自动根据传入参数是否为null值进行动态拼接
-*2. 形如 `-- :name xxx-total ` 或 `-- :name xxx-count` 的行， 翻译为 `-- :name xxx-count :? :1 :D`, 表示这是一条返回单行数据的动态select语句
-*3. 形如 `-- :name insert-xxx ` 的行， 翻译为 `-- :name insert-xxx :? :n :D`, 表示这是一条返回影响行数的插入语句
-*4. 形如 `-- :name update-xxx ` 的行， 翻译为 `-- :name update-xxx :? :n :D`, 表示这是一条返回影响行数的修改语句
-*5. 形如 `-- :name delete-xxx ` 的行， 翻译为 `-- :name delete-xxx :? :n :D`, 表示这是一条返回影响行数的删除语句
-*6. 形如 `-- :name xxx ` 的行， 翻译为 `-- :name xxx :? :* :D`, 表示这是一条返回多行数据的动态select语句
-*7. 其它形式开头的行全部不做翻译，即保持原样进行输出
+* 1. 大括号 `{` 开头的行， 翻译为 `--~ {` 开头的行， 表示此行为动态sql行，会根据传入参数是否为null值进行动态拼接
+* 2. 形如 `-- :name xxx-total ` 或 `-- :name xxx-count` 的行， 翻译为 `-- :name xxx-count :? :1 :D`, 表示这是一条返回单行数据的动态select语句
+* 3. 形如 `-- :name insert-xxx ` 的行， 翻译为 `-- :name insert-xxx :? :n :D`, 表示这是一条返回影响行数的插入语句
+* 4. 形如 `-- :name update-xxx ` 的行， 翻译为 `-- :name update-xxx :? :n :D`, 表示这是一条返回影响行数的修改语句
+* 5. 形如 `-- :name delete-xxx ` 的行， 翻译为 `-- :name delete-xxx :? :n :D`, 表示这是一条返回影响行数的删除语句
+* 6. 形如 `-- :name xxx ` 的行， 翻译为 `-- :name xxx :? :* :D`, 表示这是一条返回多行数据的动态select语句
+* 7. 其它形式开头的行全部不做翻译，即保持原样进行输出
+
+## 动态块的配置
+### 块的定义
+块是{}包括起来的内容，其中可以包含参数或者任意其它元素或者子块
+### 去除参数值为null的块语法
+
+* 正规语法：
+
+``` sql
+--~ (smart-block params "{and a.f1 = :f1}")
+```
+
+* 简易语法
+
+``` sql
+{and a.f1 = :f1}
+```
+或者
+
+``` sql
+--$ {and a.f1 = :f1}
+```
+
+### 去除参数中没有提供键的参数
+
+* 正规语法：
+
+``` sql
+--~ (smart-block params {:pred-keep-fn contain-para-name?} "set id=:id {, f1 = :f1} {, a.f2 = :f2}")
+```
+
+* 简易语法：
+
+``` sql
+--@ set id=:id {, f1 = :f1} {, a.f2 = :f2}
+```
 
 ## 排序的配置示例
 

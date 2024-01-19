@@ -1,5 +1,6 @@
 (ns org.tovictory.db.easysql
-  (:require  [clojure.string :as str]))
+  (:require  [clojure.string :as str]
+             [clojure.edn :as edn]))
 
 (defn xf-header [prefix fname]
   (let [sqlid (if (empty? prefix) fname (str prefix "-" fname))]
@@ -27,13 +28,24 @@
    (let [line (str/triml oline)]
      (cond
        (str/starts-with? line "{")
-       (str "--~ " line)
+       ;; 保留非空值的sql部分
+       (format "--~ (smart-block params \"%s\")" line)
+
+       (str/starts-with? line "--$")
+       (format "--~ (smart-block params \"%s\")" (subs line 3))
+
+       (str/starts-with? line "--@")
+       ;; 只有有键信息就保留的sql部分
+       (format "--~ (smart-block params {:pred-keep-fn contain-para-name?} \"%s\")" (subs line 3))
+
        (re-matches #"^--\s+:name\s+\S+\s*$" line)
        (let [sqlid (re-find #"(?<=\s:name\s+)\S+" line)]
          (xf-header prefix sqlid))
+
        (re-matches #"^order\s+by\s+:\w+(\.\w+)?\s*$" line)
        (let [order-by-key (second (re-matches #"^order\s+by\s+(:\w+(\.\w+)?)\s*$" line))]
          (format "--~ (order-by %s)" order-by-key))
+
        :else
        oline))))
 
