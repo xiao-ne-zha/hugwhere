@@ -28,3 +28,10 @@ pom.xml.asc
 .hg/
 
 project.clj.*
+
+# Database files
+*.db
+*.db.*
+
+# Generated SQL files
+**/queries_gen.sql
