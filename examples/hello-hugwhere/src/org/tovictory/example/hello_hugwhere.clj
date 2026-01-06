@@ -1,5 +1,6 @@
 (ns org.tovictory.example.hello-hugwhere
-  (:require [org.tovictory.db.hack-hugsql :as hh]
+  (:require [org.tovictory.db.easysql :refer [easysql->hugsql]]
+            [org.tovictory.db.hug-params] ;; 引入此命名空间主要是为了使like参数生效
             [conman.core :as conman]
             [hugsql.core :as h :refer [def-sqlvec-fns]]
             [mount.core :refer [defstate] :as m]
@@ -7,16 +8,22 @@
             [clojure.java.io :as io])
   (:gen-class))
 
-(hh/hack-hugsql)
-
 (def pool-spec {:jdbc-url "jdbc:h2:./db/dev_user.db"})
 
 (defstate ^:dynamic *db*
   :start (conman/connect! pool-spec)
   :stop (conman/disconnect! *db*))
 
-(conman/bind-connection *db* "sql/queries.sql")
-(def-sqlvec-fns (io/resource "sql/queries.sql"))
+;; Read queries.sql, convert using easysql->hugsql, and write to queries_gen.sql in resources directory
+(let [queries-content (slurp (io/resource "sql/queries.sql"))
+      converted-content (easysql->hugsql queries-content)]
+  (spit "resources/sql/queries_gen.sql" converted-content)
+  (conman/bind-connection 
+   *db* 
+   {:require-str "[org.tovictory.db.hugwhere :refer [smart-block order-by not-nil? contain-para-name?]]"} 
+   "sql/queries_gen.sql")
+  (def-sqlvec-fns "sql/queries_gen.sql"
+    {:require-str "[org.tovictory.db.hugwhere :refer [smart-block order-by not-nil? contain-para-name?]]"}))
 
 (defn -main
   [& args]

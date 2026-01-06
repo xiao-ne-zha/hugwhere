@@ -22,6 +22,7 @@ pom.xml.asc
 .lein-*
 .nrepl-*
 .DS_Store
+.vscode
 
 .hgignore
 .hg/

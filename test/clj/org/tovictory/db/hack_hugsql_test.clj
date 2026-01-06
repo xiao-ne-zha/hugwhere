@@ -7,26 +7,22 @@
             [clojure.string :as str]))
 
 (def dbfn-sql
-  [["test1" "where a = 100 { and b = :b } { or c like :c }"]
-   ["list-users" "where { id = :id and } { name like :l:name and } is_valid = 1"]
-   ["test2" "{where  a = 100 { and b = :b } { or c like :c } }"]
-   ["list-users2" "{where  { id = :id and } { name like :l:name and } is_valid = 1 }"]
-   ["test-influence" "where a = 1 { and b like :ll:b and c = 1 } { and d = :d and e != 0 }"]
-   ["test-func" "where a = 1 { and b = f( :b ,1) } { and c = fs( :c , :d ) }"]
-   ["test-func2" "where a = 1 { and b = f(f2( :b ),1) }"]])
+  [["test1" "where a = 100 {{ and b = :b }} {{ or c like :c }}"]
+   ["list-users" "where {{ id = :id and }} {{ name like :l:name and }} is_valid = 1"]
+   ["test2" "{{where  a = 100 {{ and b = :b }} {{ or c like :c }} }}"]
+   ["list-users2" "{{where  {{ id = :id and }} {{ name like :l:name and }} is_valid = 1 }}"]
+   ["test-influence" "where a = 1 {{ and b like :ll:b and c = 1 }} {{ and d = :d and e != 0 }}"]
+   ["test-func" "where a = 1 {{ and b = f( :b ,1) }} {{ and c = fs( :c , :d ) }}"]
+   ["test-func2" "where a = 1 {{ and b = f(f2( :b ),1) }}"]])
 
 (defn- sql-fn-str [[fn-name where]]
-  (easysql->hugsql (str "-- :name " fn-name " :? :* :D\nselect * from users\n--$" where
-                        "\n-- :name " fn-name "-keep-null :? :* :D\nselect * from users\n--@" where)))
+  (easysql->hugsql (str "-- :name " fn-name " :? :*\nselect * from users\n--$" where
+                        "\n-- :name " fn-name "-keep-null :? :*\nselect * from users\n--@" where)))
 
 (defn fmt-sqlvec [sqlvec]
   (let [[sql & vs] sqlvec]
     (concat [(fmt-str sql)] vs)))
 
-;;(sut/hack-hugsql)
-#_(->> (map sql-fn-str dbfn-sql)
-     (str/join "\n")
-     hs/def-sqlvec-fns-from-string)
 (hs/def-sqlvec-fns-from-string
   (str/join "\n"
             (map sql-fn-str dbfn-sql))
@@ -47,9 +43,9 @@
       nil ["select * from users\nwhere a = 1"]
       {:b nil} ["select * from users\nwhere a = 1"]
       {:b "name"} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
-      ;;{:c 100} ["select * from users\nwhere a = 1"] 报错，此处要求c、d必须同时提供，大部分函数也不支持变参
+      {:c 100} ["select * from users\nwhere a = 1"] ;;报错，此处要求c、d必须同时提供，大部分函数也不支持变参
       {:c 100, :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]
-      ;;{:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+      {:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
       {:b nil :c 100 :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]))
   (testing "cascade function"
     (are [params sqls]
@@ -66,9 +62,9 @@
       nil ["select * from users\nwhere a = 1"]
       {:b nil} ["select * from users\nwhere a = 1 and b = f( ? ,1)" nil]
       {:b "name"} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
-      ;;{:c 100} ["select * from users\nwhere a = 1"] 报错，此处要求c、d必须同时提供，大部分函数也不支持变参
+      {:c 100} ["select * from users\nwhere a = 1"] ;;报错，此处要求c、d必须同时提供，大部分函数也不支持变参
       {:c 100, :d 1} ["select * from users\nwhere a = 1 and c = fs( ? , ? )" 100 1]
-      ;;{:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f(?,1)" "name"]
+      {:b "name" :c 100} ["select * from users\nwhere a = 1 and b = f( ? ,1)" "name"]
       {:b nil :c 100 :d 1} ["select * from users\nwhere a = 1 and b = f( ? ,1) and c = fs( ? , ? )" nil 100 1]))
   (testing "cascade function"
     (are [params sqls]

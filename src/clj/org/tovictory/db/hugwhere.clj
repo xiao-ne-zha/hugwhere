@@ -11,7 +11,7 @@
   ([params sql] (smart-block params nil sql))
   ([params options sql]
    (let [result (xf-statement params options sql)]
-     (if (empty? result)
+     (if (or (empty? result) (empty? (str/trim result)))
        nil
        result))))
 

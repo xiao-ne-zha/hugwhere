@@ -70,7 +70,7 @@
       {:b 1 :c "x"} "where a = 100 and b = :b or c like :c"))
   (testing "normal block in sql"
     (are [params exp]
-        (= (fmt-str (sut/xf-statement params "where { id = :id and } { name like :l:name and } is_valid = 1"))
+        (= (fmt-str (sut/xf-statement params "where {{ id = :id and }} {{ name like :l:name and }} is_valid = 1"))
            exp)
       nil "where is_valid = 1"
       {:id 1} "where id = :id and is_valid = 1"
@@ -80,7 +80,7 @@
         (= (fmt-str (sut/xf-statement
                      params
                      {:pred-keep-fn sut/contain-para-name?}
-                     "where { id = :id and } { name like :l:name and } is_valid = 1"))
+                     "where {{ id = :id and }} {{ name like :l:name and }} is_valid = 1"))
            exp)
       nil "where is_valid = 1"
       {:id 1} "where id = :id and is_valid = 1"
@@ -88,7 +88,7 @@
       {:id 1 :name "nezha"} "where id = :id and name like :l:name and is_valid = 1"))
   (testing "remove constant condition if params is nil"
     (are [params exp]
-        (= (fmt-str (sut/xf-statement params " {where a = 100 { and b = :b } { or c like :c } }"))
+        (= (fmt-str (sut/xf-statement params " {{where a = 100 {{ and b = :b }} {{ or c like :c }} }}"))
            exp)
       nil ""
       {:b nil} ""
@@ -100,7 +100,7 @@
         (= (fmt-str (sut/xf-statement
                      params
                      {:pred-keep-fn sut/contain-para-name?}
-                     " {where a = 100 { and b = :b } { or c like :c } }"))
+                     " {{where a = 100 {{ and b = :b }} {{ or c like :c }} }}"))
            exp)
       nil ""
       {:b nil} "where a = 100 and b = :b"
@@ -109,7 +109,7 @@
       {:b 1 :c "x"} "where a = 100 and b = :b or c like :c"))
   (testing "sense c but not b"
     (are [params exp]
-        (= (fmt-str (sut/xf-statement params " {where { a = 100 and b = :b or } c like :c }"))
+        (= (fmt-str (sut/xf-statement params " {{where {{ a = 100 and b = :b or }} c like :c }}"))
            exp)
       nil ""
       {:b nil} ""
@@ -121,7 +121,7 @@
         (= (fmt-str (sut/xf-statement
                      params
                      {:pred-keep-fn sut/contain-para-name?}
-                     " {where { a = 100 and b = :b or } c like :c }"))
+                     " {{where {{ a = 100 and b = :b or }} c like :c }}"))
            exp)
       nil ""
       {:b nil} ""
@@ -132,7 +132,7 @@
       {:b 1 :c "x"} "where a = 100 and b = :b or c like :c"))
   (testing "sensitive in readme"
     (are [params exp]
-        (= (fmt-str (sut/xf-statement params "where id = :id { and name like :l:name and is_valid = 1 }"))
+        (= (fmt-str (sut/xf-statement params "where id = :id {{ and name like :l:name and is_valid = 1 }}"))
            exp)
         nil "where id = :id"
         {:id 1} "where id = :id"
@@ -144,7 +144,7 @@
            (fmt-str
             (sut/xf-statement
              params
-             "{id = :id and name like :r:name and xxx}")))
+             "{{id = :id and name like :r:name and xxx}}")))
       nil ""
       {} ""
       {:id nil :name nil} ""
@@ -157,7 +157,7 @@
            (fmt-str
             (sut/xf-statement
              params
-             "{where xxx {and id = :id} {and name like :r:name}}")))
+             "{{where xxx {{and id = :id}} {{and name like :r:name}}}}")))
       nil ""
       {} ""
       {:id 1} "where xxx and id = :id"
