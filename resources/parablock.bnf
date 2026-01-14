@@ -1,7 +1,83 @@
-(* 该语言的一个语句为任意多个参数(parameter)、块(block)和其他元素(other)的组合 *)
-statement = (other | parameter | block)+
+(* 该语言的一个语句为任意多个参数(parameter)、块(block)、选择列表(select-list)和其他元素(other)的组合 *)
+statement = (other | parameter | block | select-list)+
 (* block 是由 `{{}}`包围的 任意多个参数(parameter)、块(block)和其他元素(other)的组合 *)
 block = <'{{'> (other | parameter | block)+ <'}}'>
+
+(* select-list 是由 `[[]]`包围的 SELECT 列表，用于动态列选择 *)
+(* 注意：select-list 内部不允许参数，以防止SQL注入 *)
+(* 内容必须是合法的 SQL SELECT 列表表达式，支持列名、函数调用、别名等 *)
+select-list = <'[['> select-content <']]'>
+
+(* select-content 是 SELECT 列表的内容，由一个或多个 select-item 组成，用逗号分隔 *)
+select-content = select-item (<'',''> select-item)*
+
+(* select-item 是 SELECT 列表中的一个项目 *)
+select-item = select-expr (<'AS'>? column-alias)?
+
+(* select-expr 是选择表达式，可以是列名、函数调用或常量 *)
+(* 安全限制：不允许参数（不以冒号开头），不允许子查询，不允许危险关键字 *)
+select-expr = qualified-name
+            | function-call
+            | literal
+            | case-expr
+            | cast-expr
+            | arithmetic-expr
+
+(* qualified-name 限定列名，支持 table.column 或 schema.table.column *)
+(* 使用严格的字符限制防止注入：只允许字母、数字、下划线和点号 *)
+qualified-name = #"[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*"
+
+(* function-call 函数调用，支持标准SQL函数 *)
+function-call = function-name <'('> function-args? <')'>
+
+(* function-name 函数名，严格限制为字母、数字和下划线 *)
+function-name = #"[A-Za-z_][A-Za-z0-9_]*"
+
+(* function-args 函数参数列表 *)
+function-args = function-arg (<'',''> function-arg)*
+
+(* function-arg 函数参数，可以是列名、字面量或嵌套函数调用 *)
+(* 注意：不允许参数，不允许子查询 *)
+function-arg = qualified-name | literal | function-call | arithmetic-expr
+
+(* literal 字面量，包括字符串和数字 *)
+literal = string-literal | number-literal
+
+(* string-literal 字符串字面量，使用单引号 *)
+(* 支持转义的单引号（两个单引号表示一个单引号） *)
+string-literal = #"'(''|[^'])*'"
+
+(* number-literal 数字字面量，支持整数和小数 *)
+number-literal = #"\\d+(\\.\\d+)?"
+
+(* case-expr CASE 表达式 *)
+case-expr = <'CASE'> (when-clause)+ (<'ELSE'> select-expr)? <'END'>
+
+(* when-clause WHEN 子句 *)
+when-clause = <'WHEN'> condition <'THEN'> select-expr
+
+(* condition 条件表达式，使用比较运算符 *)
+condition = select-expr comparison-op select-expr
+          | select-expr
+
+(* comparison-op 比较运算符 *)
+comparison-op = <'='> | <'<>'> | <'!='> | <'<' > | <'<='> | <'>'> | <'>='>
+
+(* cast-expr CAST 表达式，用于类型转换 *)
+cast-expr = <'CAST'> <'('> select-expr <'AS'> cast-type <')'>
+
+(* cast-type CAST 目标类型 *)
+(* 支持常见的数据类型：VARCHAR, INTEGER, DATE, TIMESTAMP 等 *)
+cast-type = #"[A-Za-z]+(\\(\\d+(\\s*,\\s*\\d+)?\\))?"
+
+(* arithmetic-expr 算术表达式 *)
+arithmetic-expr = select-expr arithmetic-op select-expr
+
+(* arithmetic-op 算术运算符 *)
+arithmetic-op = <'+'> | <'-' | <'*'> | <'/'>
+
+(* column-alias 列别名 *)
+column-alias = #"[A-Za-z_][A-Za-z0-9_]*" | string-literal
 (* 参数是指hugsql中所允许的参数形式，使用优先级规则避免解析冲突：先尝试匹配带类型参数，再尝试匹配普通参数 *)
 parameter = (PARA_TYPE PARA_NAME) / PARA_NAME
 (* 参数类型，以冒号开头，后跟字母、连字符和可选的星号 *)
