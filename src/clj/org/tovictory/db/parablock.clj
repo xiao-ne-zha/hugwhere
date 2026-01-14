@@ -213,9 +213,12 @@
         ;; rest-args格式：[select-expr 'AS'? column-alias?]
         (let [select-expr (first rest-args)
               alias-expr (when (> (count rest-args) 1)
-                           (last rest-args))]
-          [{:code (ast->str select-expr)
-            :alias (when alias-expr (ast->str alias-expr))}])
+                           (last rest-args))
+              code (ast->str select-expr)]
+          [{:code code
+            :alias (if alias-expr 
+                     (ast->str alias-expr)
+                     code)}])
 
         :select-expr
         ;; select-expr节点，不需要处理，由select-item处理
@@ -333,11 +336,10 @@
         {:params [] :system_params []})
       (let [named-params (extract-named-parameters result)
             select-list-cols (->> result
-                                (mapcat extract-select-columns)
-                                (filter :code)
-                                vec)]
-        (cond-> named-params
-                (seq select-list-cols) (assoc :result_columns select-list-cols))))))
+                                  (mapcat extract-select-columns)
+                                  (filter :code)
+                                  vec)]
+        (assoc named-params :result_columns select-list-cols)))))
 
 (defn xf-statement
   "将SQL模板语句转换为最终SQL语句。
