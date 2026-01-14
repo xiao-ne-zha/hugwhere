@@ -100,8 +100,129 @@
       :else
       (->> snippets
            (map second)
-           (str/join \space))
-      )))
+           (str/join \space)))))
+
+(defn- ast->str
+  "将AST节点转换为字符串。
+
+   递归遍历AST节点，将所有内容拼接成字符串。
+
+   ast - AST节点
+   返回: 转换后的字符串"
+  [ast]
+  (if (string? ast)
+    ast
+    (if (vector? ast)
+      (let [[tp & rest] ast]
+        (if (= :select-list tp)
+          ;; 对于select-list，递归处理其内容
+          (->> rest (map ast->str) (str/join \space))
+          ;; 其他节点，拼接所有子节点
+          (->> rest (map ast->str) (str/join \space))))
+      (str ast))))
+
+(defn validate-select-content
+  "验证select-content是否合法，防止SQL注入。
+
+   使用select-list语法规则解析select-content，
+   如果解析失败则说明内容不合法或包含注入攻击。
+
+   select-content - SELECT列表内容字符串
+   返回: 合法时返回true，非法时返回false"
+  [select-content]
+  (try
+    (let [wrapped (str "[[" select-content "]]")
+          result (parser wrapped)]
+      (not (insta/failure? result)))
+    (catch Exception _
+      false)))
+
+(defn assemble-select-content
+  "从:_cols参数组装select-content字符串。
+
+   :_cols参数格式：[[code-or-select-expr alias] ...]
+   其中：
+   - code-or-select-expr: 列的表达式（列名、函数调用等）
+   - alias: 列别名（可选）
+
+   参数说明：
+   cols - :_cols参数的值，格式为 [[code alias] ...]
+
+   返回: 组装后的select-content字符串
+
+   示例：
+   (assemble-select-content [[\"id\" nil] [\"name\" \"user_name\"] [\"COUNT(*)\" \"total\"]])
+   => \"id, name AS user_name, COUNT(*) AS total\""
+  [cols]
+  (when (and (coll? cols) (seq cols))
+    (let [items (map (fn [[col-code alias]]
+                       (if (str/blank? alias)
+                         col-code
+                         (str col-code " AS " alias)))
+                     cols)]
+      (str/join ", " items))))
+
+(defn xf-select-list
+  "处理select-list块，根据:_cols参数决定如何处理。
+
+   处理逻辑：
+   1. 当params中未提供:_cols参数时，使用select-content原始内容
+   2. 当params中提供:_cols参数时：
+      - 使用:_cols值组装select-content
+      - 验证组装后的内容是否合法（防止SQL注入）
+      - 如果合法则使用组装的内容，否则使用原始内容
+
+   ast - select-list的AST节点，格式为 [:select-list select-content]
+   params - 参数map
+   options - 配置选项（未使用，保留以保持接口一致性）
+
+   返回: 转换后的SELECT列表字符串"
+  [[_ content-ast] params _]
+  (let [original-content (ast->str content-ast)
+        cols-param (get params :_cols)]
+    (if (nil? cols-param)
+      ;; 未提供:_cols参数，使用原始内容
+      original-content
+      ;; 提供:_cols参数，尝试组装并验证
+      (let [assembled-content (assemble-select-content cols-param)]
+        (if (and assembled-content (validate-select-content assembled-content))
+          ;; 验证通过，使用组装的内容
+          assembled-content
+          ;; 验证失败，使用原始内容
+          original-content)))))
+
+(defn- extract-select-columns
+  "从select-list的AST中提取列信息。
+
+   递归遍历select-list的AST，提取每列的code和alias信息。
+
+   ast-node - select-list的AST节点
+   返回: 列信息map的向量，格式如下：
+         [{:code \"column_name\" :alias \"column_alias\"} ...]
+         如果没有alias则为nil"
+  [ast-node]
+  (when (vector? ast-node)
+    (let [[tp & rest-args] ast-node]
+      (case tp
+        :select-list
+        ;; 进入select-list，提取其内容中的列信息
+        (mapcat extract-select-columns rest-args)
+
+        :select-item
+        ;; select-item: select-expr (AS? column-alias)?
+        ;; rest-args格式：[select-expr 'AS'? column-alias?]
+        (let [select-expr (first rest-args)
+              alias-expr (when (> (count rest-args) 1)
+                           (last rest-args))]
+          [{:code (ast->str select-expr)
+            :alias (when alias-expr (ast->str alias-expr))}])
+
+        :select-expr
+        ;; select-expr节点，不需要处理，由select-item处理
+        []
+
+        ;; 其他节点，遍历子节点
+        (mapcat extract-select-columns rest-args)))))
 
 (defn- xf-ast
   "对AST节点进行转换。
@@ -117,6 +238,7 @@
    ast - AST节点，可以是以下类型：
      :parameter - 参数节点，不在块内时不传参数map
      :block - 块节点，需要传递参数map
+     :select-list - select-list节点，根据:_cols参数决定如何处理
      其他 - 直接返回节点内容
 
    返回: 转换后的SQL片段字符串"
@@ -126,6 +248,7 @@
      ;; 此时不在块内，所以不能传参数
      :parameter (xf-parameter ast)
      :block (xf-block ast params options)
+     :select-list (xf-select-list ast params options)
      (second ast))))
 
 (defn- extract-parameters
@@ -162,11 +285,11 @@
         ;; 对于 statement 或其他节点，遍历子节点
         (mapcat #(extract-parameters % in-block?) rest-args)))))
 
-(defn extract-named-parameters
-  "根据parablock.bnf语法，提取sql中的命名参数信息。
+(defn- extract-named-parameters
+  "根据parablock.bnf语法，从AST中提取命名参数信息。
 
    参数说明：
-   sql - SQL模板字符串
+   ast - SQL模板解析后的AST
 
    返回格式：
    {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
@@ -175,64 +298,19 @@
    注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中，否则放到params中
-   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
-   4. 解析失败时返回空列表并记录错误日志"
-  [sql]
-  (let [result (parser sql)]
-    (if (insta/failure? result)
-      (do
-        (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
-        {:params [] :system_params []})
-      (let [all-params (mapcat #(extract-parameters % false) result)
-            params (filter #(not (.startsWith (:para_name %) "_")) all-params)
-            system-params (filter #(.startsWith (:para_name %) "_") all-params)]
-        {:params params
-         :system_params system-params}))))
-
-(defn extract-result-columns
-  "从SQL字符串中提取结果列信息。
-
-   查找以'--~'开头（前面可能有空白符）且包含
-   (if (seq (:_cols params))...的注释行，从该行的第二个字符串中提取列信息。
-
-   参数说明：
-   sql - 完整的SQL字符串
-
-   返回: 列信息map的向量，格式如下：
-         [{:col_name \"id\"} {:col_name \"customer_no\"} ...]
-         未找到时返回nil，解析出错时记录日志并返回nil
-
-   示例注释行：
-   --~ (if (seq (:_cols params)) \"id, name, email\" \"id, name\")"
-  [sql]
-  (when (string? sql)
-    (try
-      ;; 按行分割SQL
-      (let [lines (str/split-lines sql)
-            ;; 查找符合条件的行（--~前面可能有空白符）
-            target-line (first (filter #(re-find #"^\s*--~\s*\(\s*if\s+\(\s*seq.+?:_cols" %)
-                                       lines))]
-        (when target-line
-          ;; 使用正则表达式直接提取第二个双引号字符串的内容
-          (when-let [match (re-find #"\"([^\"]*?)\"\s+\"([^\"]*)\"" target-line)]
-            ;; match 是 [整个匹配 第一个字符串内容 第二个字符串内容]
-            (when (>= (count match) 3)
-              ;; 获取第二个字符串（默认列列表）
-              (let [cols-str (nth match 2)]
-                ;; 分割列名并去除空格
-                (->> (str/split cols-str #",")
-                     (map str/trim)
-                     (filter (complement str/blank?))
-                     (map #(hash-map :col_name %))
-                     vec))))))
-      (catch Exception e
-        (log/error "parse result columns error, sql:" sql "error:" e)
-        nil))))
+   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）"
+  [ast]
+  (let [all-params (mapcat #(extract-parameters % false) ast)
+        params (filter #(not (.startsWith (:para_name %) "_")) all-params)
+        system-params (filter #(.startsWith (:para_name %) "_") all-params)]
+    {:params params
+     :system_params system-params}))
 
 (defn extract-sql-metadata
   "提取SQL的元数据信息，包括参数信息和结果列信息。
 
-   这是一个组合函数，整合了 extract-named-parameters 和 extract-result-columns 的结果。
+   这是一个组合函数，整合了 extract-named-parameters
+   和 extract-select-columns 的结果。
 
    参数说明：
    sql - 完整的SQL字符串
@@ -240,17 +318,26 @@
    返回格式：
    {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
     :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
-    :result_columns [{:col_name \"col_name\"}]}
+    :result_columns [{:code \"column_expr\" :alias \"column_alias\"}]}
 
    注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中
    3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
-   4. result_columns从注释行 --~ (if (seq (:_cols params))... 的第二个字符串中提取"
+   4. result_columns从select-list块中提取，直接使用extract-select-columns的返回格式"
   [sql]
-  (let [named-params (extract-named-parameters sql)
-        result-cols (extract-result-columns sql)]
-    (assoc named-params :result_columns result-cols)))
+  (let [result (parser sql)]
+    (if (insta/failure? result)
+      (do
+        (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
+        {:params [] :system_params []})
+      (let [named-params (extract-named-parameters result)
+            select-list-cols (->> result
+                                (mapcat extract-select-columns)
+                                (filter :code)
+                                vec)]
+        (cond-> named-params
+                (seq select-list-cols) (assoc :result_columns select-list-cols))))))
 
 (defn xf-statement
   "将SQL模板语句转换为最终SQL语句。
@@ -278,3 +365,14 @@
        (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
        (let [f (partial xf-ast params options)]
          (->> result rest (map f) (filter identity) (str/join \space)))))))
+
+(comment
+  (extract-sql-metadata
+   "SELECT
+   [[ID, CODE, NAME, TML_ID, MODEL_ID, LIFE_STATE_ID, CREATE_DATE, count(1) AS cnt]]
+FROM OBD
+WHERE model_id = :model_id AND life_state_id = :life_state_id
+{{ AND code like :l:code }}
+{{ AND name like :l:name }} {{ AND create_date >= :create_date_start }} {{ AND create_date <= :create_date_end }}
+order by :_order_by
+{{ LIMIT :_limit OFFSET :_offset }}"))

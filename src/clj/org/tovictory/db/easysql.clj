@@ -1,6 +1,7 @@
 (ns org.tovictory.db.easysql
   (:require  [clojure.string :as str]
              [hugsql.core :as hs]
+             [org.tovictory.db.hug-params]
              [hugsql.parser :as hp]
              [clojure.edn :as edn]))
 
@@ -29,7 +30,7 @@
   ([prefix oline]
    (let [line (str/triml oline)]
      (cond
-       (str/starts-with? line "{{")
+       (or (str/starts-with? line "{{") (str/starts-with? line "[["))
        ;; 保留非空值的sql部分
        (format "--~ (smart-block params \"%s\")" line)
 
@@ -78,4 +79,12 @@
   ;; 考虑到复杂性需要对齐等因素，建议采用/*~ clojure form ~*/ 形式
   (easysql->hugsql "-- :name test-expr\n--comment\n--~(let [s1 \"select * from table-a\"] (str s1 (when (:name params) \" where ddd\")))")
   (easysql->hugsql "-- :name test-expr\n--comment\n/*~(when (:name params) \"and name = :name\")~*/")
-  (easysql->hugsql "-- :name test-expr\n--comment\n/*~\n--~(when (:name params) \"and name = :name\")\n~*/"))
+  (easysql->hugsql "-- :name test-expr\n--comment\n/*~\n--~(when (:name params) \"and name = :name\")\n~*/")
+  (easysql->hugsql "SELECT
+   [[ID, CODE, NAME, TML_ID, MODEL_ID, LIFE_STATE_ID, CREATE_DATE, count(1) AS cnt]]
+FROM OBD
+WHERE model_id = :model_id AND life_state_id = :life_state_id
+{{ AND code like :l:code }}
+{{ AND name like :l:name }} {{ AND create_date >= :create_date_start }} {{ AND create_date <= :create_date_end }}
+order by :_order_by
+{{ LIMIT :_limit OFFSET :_offset }}"))
