@@ -8,10 +8,25 @@
 
 (defparser ^:private parser (slurp (io/resource "parablock.bnf")) :auto-whitespace :standard)
 
-(defn not-nil? [params para-key-vec]
+(defn not-nil?
+  "检查参数中指定路径的值是否不为nil。
+
+   params - 参数map
+   para-key-vec - 参数路径向量，如 [:a :b :c]
+   返回: 当路径存在且值不为nil时返回true，否则返回false"
+  [params para-key-vec]
   (not (nil? (get-in params para-key-vec))))
 
-(defn contain-para-name? [params para-key-vec]
+(defn contain-para-name?
+  "检查参数map中是否包含指定的路径键。
+
+   递归检查路径中的每一层是否都存在于参数map中。
+   与 not-nil? 不同，此函数只检查键是否存在，不检查值是否为nil。
+
+   params - 参数map
+   para-key-vec - 参数路径向量，如 [:a :b :c]
+   返回: 当路径中的所有键都存在时返回true，否则返回false"
+  [params para-key-vec]
   (loop [fk (first para-key-vec) rkvec (rest para-key-vec) p params]
     (if (nil? fk)
       true
@@ -20,7 +35,25 @@
         (recur (first rkvec) (rest rkvec) (get p fk))))))
 
 (defn xf-parameter
-  "对参数进行转换。当在块内时，能获取到值，才保留。"
+  "对参数进行转换。当在块内时，能获取到值，才保留。
+
+   单参数形式（无参数map）：
+   直接转换为参数字符串，不进行值检查。用于块外的参数。
+
+   双参数形式（带参数map）：
+   根据参数值的存在性决定是否保留参数。用于块内的参数。
+
+   参数格式：
+   - [:para-name] 转换为 :para-name
+   - [:para-type :para-name] 转换为 :para-type:para-name
+
+   ast - 参数的AST节点，格式为 [:parameter para-type? para-name]
+   params - 参数map
+   options - 配置选项
+     :pred-keep-fn - 参数保留谓词函数，默认为 not-nil?
+                    接收 [params para-key-vec]，返回是否保留参数
+
+   返回: 转换后的参数字符串，或不满足条件时返回nil"
   ([[_ & parameter]]
    (if (= 1 (count parameter))
      (str ":" (first parameter))
@@ -35,8 +68,19 @@
 
 (defn xf-block
   "根据参数中值的情况，转换得到块的结果。
-  1. 当parameter对应在请求参数map中没有值时，block返回nil.如果block内有多个parameter时，只要有一个没有值，整个block就返回nil.主要考虑是如果允许部分parameter的值为nil,会导致sql语法错误
-  3. 当有parameter时， 保留本层的other, parameter"
+
+   块的保留规则：
+   1. 当任意parameter在请求参数map中没有值时，整个block返回nil
+      如果block内有多个parameter，只要有一个没有值，整个block就返回nil
+      主要考虑是如果允许部分parameter的值为nil，会导致SQL语法错误
+   2. 当没有parameter且所有下层block均为nil时，返回nil
+   3. 否则，保留本层的所有内容（包括other和parameter）
+
+   ast - 块的AST节点，格式为 [:block & elements]
+   params - 参数map
+   options - 配置选项，传递给 xf-parameter
+
+   返回: 转换后的SQL片段字符串，或不满足条件时返回nil"
   [[_ & elements] params options]
   (let [snippets (map (fn [[tp :as ast]]
                         (case tp
@@ -60,6 +104,22 @@
       )))
 
 (defn- xf-ast
+  "对AST节点进行转换。
+
+   单参数形式：
+   options默认为nil
+
+   双参数形式：
+   根据节点类型进行相应的转换
+
+   params - 参数map
+   options - 配置选项
+   ast - AST节点，可以是以下类型：
+     :parameter - 参数节点，不在块内时不传参数map
+     :block - 块节点，需要传递参数map
+     其他 - 直接返回节点内容
+
+   返回: 转换后的SQL片段字符串"
   ([params ast] (xf-ast params nil ast))
   ([params options [tp :as ast]]
    (case tp
@@ -69,8 +129,17 @@
      (second ast))))
 
 (defn- extract-parameters
-  "从AST中递归提取所有参数信息
-   in-block?: 表示当前参数是否在块内（可选参数）"
+  "从AST中递归提取所有参数信息。
+
+   根据参数所在位置（块内或块外）判断参数是否为必需参数。
+
+   ast-node - AST节点
+   in-block? - 布尔值，表示当前参数是否在块内
+               true表示在块内，参数为可选（required=false）
+               false表示不在块内，参数为必需（required=true）
+
+   返回: 参数信息map的序列
+         [{:para_name \"参数名\" :para_type \"参数类型\" :required true/false} ...]"
   [ast-node in-block?]
   (when (vector? ast-node)
     (let [[tp & rest-args] ast-node]
@@ -95,14 +164,19 @@
 
 (defn extract-named-parameters
   "根据parablock.bnf语法，提取sql中的命名参数信息。
+
+   参数说明：
+   sql - SQL模板字符串
+
    返回格式：
    {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
     :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]}
 
-   注意：
+   注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
-   2. 当para_name以`_`开头时，放到system_params中
-   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）"
+   2. 当para_name以`_`开头时，放到system_params中，否则放到params中
+   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
+   4. 解析失败时返回空列表并记录错误日志"
   [sql]
   (let [result (parser sql)]
     (if (insta/failure? result)
@@ -117,11 +191,19 @@
 
 (defn extract-result-columns
   "从SQL字符串中提取结果列信息。
-   查找以'--~'开头（前面可能有空白符）且包含(if (seq (:_cols params))...的注释行，
-   从该行的第二个字符串中提取列信息（即默认列列表）
 
-   输入：完整的SQL字符串
-   输出：[{:col_name \"id\"} {:col_name \"customer_no\"} ...]"
+   查找以'--~'开头（前面可能有空白符）且包含
+   (if (seq (:_cols params))...的注释行，从该行的第二个字符串中提取列信息。
+
+   参数说明：
+   sql - 完整的SQL字符串
+
+   返回: 列信息map的向量，格式如下：
+         [{:col_name \"id\"} {:col_name \"customer_no\"} ...]
+         未找到时返回nil，解析出错时记录日志并返回nil
+
+   示例注释行：
+   --~ (if (seq (:_cols params)) \"id, name, email\" \"id, name\")"
   [sql]
   (when (string? sql)
     (try
@@ -150,13 +232,17 @@
 (defn extract-sql-metadata
   "提取SQL的元数据信息，包括参数信息和结果列信息。
 
-   输入：完整的SQL字符串
-   输出：
+   这是一个组合函数，整合了 extract-named-parameters 和 extract-result-columns 的结果。
+
+   参数说明：
+   sql - 完整的SQL字符串
+
+   返回格式：
    {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
     :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
     :result_columns [{:col_name \"col_name\"}]}
 
-   注意：
+   注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中
    3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
@@ -167,7 +253,24 @@
     (assoc named-params :result_columns result-cols)))
 
 (defn xf-statement
-  "每个元素均做转换拼接"
+  "将SQL模板语句转换为最终SQL语句。
+
+   对SQL语句中的每个元素进行转换和拼接，处理参数替换和块条件。
+
+   单参数形式：
+   options默认为nil
+
+   双参数形式：
+   使用options配置进行转换
+
+   参数说明：
+   params - 参数map，包含参数键值对
+   sql - SQL模板字符串
+   options - 配置选项，传递给 xf-block 和 xf-parameter
+     :pred-keep-fn - 参数保留谓词函数，默认为 not-nil?
+
+   返回: 转换后的SQL字符串
+         解析失败时返回nil并记录错误日志"
   ([params sql] (xf-statement params nil sql))
   ([params options sql]
    (let [result (parser sql)]
