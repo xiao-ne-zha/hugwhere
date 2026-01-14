@@ -68,6 +68,104 @@
      :block (xf-block ast params options)
      (second ast))))
 
+(defn- extract-parameters
+  "从AST中递归提取所有参数信息
+   in-block?: 表示当前参数是否在块内（可选参数）"
+  [ast-node in-block?]
+  (when (vector? ast-node)
+    (let [[tp & rest-args] ast-node]
+      (case tp
+        :parameter
+        (let [para-list rest-args
+              para-type (when (= 2 (count para-list)) (first para-list))
+              para-name (if (= 1 (count para-list))
+                          (first para-list)
+                          (second para-list))
+              para-type (or para-type "v")]
+          [{:para_name para-name
+            :para_type para-type
+            :required (not in-block?)}])
+
+        :block
+        ;; 进入块内，所有参数都是可选的
+        (mapcat #(extract-parameters % true) rest-args)
+
+        ;; 对于 statement 或其他节点，遍历子节点
+        (mapcat #(extract-parameters % in-block?) rest-args)))))
+
+(defn extract-named-parameters
+  "根据parablock.bnf语法，提取sql中的命名参数信息。
+   返回格式：
+   {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
+    :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]}
+
+   注意：
+   1. 当para_type没有值时，取默认值 \"v\"
+   2. 当para_name以`_`开头时，放到system_params中
+   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）"
+  [sql]
+  (let [result (parser sql)]
+    (if (insta/failure? result)
+      (do
+        (log/error "parse sql error, sql template is " sql "\nfailure info:\n" result)
+        {:params [] :system_params []})
+      (let [all-params (mapcat #(extract-parameters % false) result)
+            params (filter #(not (.startsWith (:para_name %) "_")) all-params)
+            system-params (filter #(.startsWith (:para_name %) "_") all-params)]
+        {:params params
+         :system_params system-params}))))
+
+(defn extract-result-columns
+  "从SQL字符串中提取结果列信息。
+   查找以'--~'开头（前面可能有空白符）且包含(if (seq (:_cols params))...的注释行，
+   从该行的第二个字符串中提取列信息（即默认列列表）
+
+   输入：完整的SQL字符串
+   输出：[{:col_name \"id\"} {:col_name \"customer_no\"} ...]"
+  [sql]
+  (when (string? sql)
+    (try
+      ;; 按行分割SQL
+      (let [lines (str/split-lines sql)
+            ;; 查找符合条件的行（--~前面可能有空白符）
+            target-line (first (filter #(re-find #"^\s*--~\s*\(\s*if\s+\(\s*seq.+?:_cols" %)
+                                       lines))]
+        (when target-line
+          ;; 使用正则表达式直接提取第二个双引号字符串的内容
+          (when-let [match (re-find #"\"([^\"]*?)\"\s+\"([^\"]*)\"" target-line)]
+            ;; match 是 [整个匹配 第一个字符串内容 第二个字符串内容]
+            (when (>= (count match) 3)
+              ;; 获取第二个字符串（默认列列表）
+              (let [cols-str (nth match 2)]
+                ;; 分割列名并去除空格
+                (->> (str/split cols-str #",")
+                     (map str/trim)
+                     (filter (complement str/blank?))
+                     (map #(hash-map :col_name %))
+                     vec))))))
+      (catch Exception e
+        (log/error "parse result columns error, sql:" sql "error:" e)
+        nil))))
+
+(defn extract-sql-metadata
+  "提取SQL的元数据信息，包括参数信息和结果列信息。
+
+   输入：完整的SQL字符串
+   输出：
+   {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
+    :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
+    :result_columns [{:col_name \"col_name\"}]}
+
+   注意：
+   1. 当para_type没有值时，取默认值 \"v\"
+   2. 当para_name以`_`开头时，放到system_params中
+   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
+   4. result_columns从注释行 --~ (if (seq (:_cols params))... 的第二个字符串中提取"
+  [sql]
+  (let [named-params (extract-named-parameters sql)
+        result-cols (extract-result-columns sql)]
+    (assoc named-params :result_columns result-cols)))
+
 (defn xf-statement
   "每个元素均做转换拼接"
   ([params sql] (xf-statement params nil sql))
