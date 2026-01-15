@@ -214,11 +214,11 @@
         (let [select-expr (first rest-args)
               alias-expr (when (> (count rest-args) 1)
                            (last rest-args))
-              code (ast->str select-expr)]
+              code (str/trim (ast->str select-expr))
+              code-last-part (last (str/split code #"."))
+              alias (if alias-expr (ast->str alias-expr) code-last-part)]
           [{:code code
-            :alias (if alias-expr 
-                     (ast->str alias-expr)
-                     code)}])
+            :alias alias}])
 
         :select-expr
         ;; select-expr节点，不需要处理，由select-item处理
