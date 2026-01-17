@@ -25,13 +25,13 @@ select-expr = qualified-name
 
 (* qualified-name 限定列名，支持 table.column 或 schema.table.column *)
 (* 使用严格的字符限制防止注入：只允许字母、数字、下划线和点号 *)
-qualified-name = #"[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*"
+qualified-name = #"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"
 
 (* function-call 函数调用，支持标准SQL函数 *)
 function-call = function-name '(' function-args? ')'
 
 (* function-name 函数名，严格限制为字母、数字和下划线 *)
-function-name = #"[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*"
+function-name = #"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"
 
 (* function-args 函数参数列表 *)
 function-args = function-arg (',' function-arg)*

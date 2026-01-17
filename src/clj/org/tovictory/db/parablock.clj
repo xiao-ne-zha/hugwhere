@@ -377,4 +377,26 @@ WHERE model_id = :model_id AND life_state_id = :life_state_id
 {{ AND code like :l:code }}
 {{ AND name like :l:name }} {{ AND create_date >= :create_date_start }} {{ AND create_date <= :create_date_end }}
 order by :_order_by
+{{ LIMIT :_limit OFFSET :_offset }}")
+  (extract-sql-metadata
+   "SELECT
+   [[ID id_alias, 1+2 AS text_match, 1 + 2 test_math2, CODE, NAME, TML_ID, MODEL_ID, LIFE_STATE_ID, CREATE_DATE, count(1) AS cnt]]
+FROM OBD
+WHERE model_id = :model_id AND life_state_id = :life_state_id
+{{ AND code like :l:code }}
+{{ AND name like :l:name }} {{ AND create_date >= :create_date_start }} {{ AND create_date <= :create_date_end }}
+order by :_order_by
+{{ LIMIT :_limit OFFSET :_offset }}")
+  (extract-sql-metadata
+   "SELECT
+  [[a.ID, a.CODE, a.NAME, a.REGION_ID, a.TML_ID, a.FACILITY_ID, a.DEVICE_ID, a.SEQ, a.ROW_NO, a.COL_NO, a.CREATOR_ID, a.CREATE_DATE, a.MODIFIER_ID, a.MODIFY_DATE, a.VERSION, a.NOTES]]
+FROM SLOT a,WARE_HOLD_WARE b
+WHERE 1 = 1
+AND a.id = b.child_id
+AND b.parent_spec_id = 1030200001
+{{ AND a.ID in (:v*:_ids) }}
+{{ AND a.code like :l:code }}
+{{ AND a.name like :l:name }}
+AND b.parent_id = :parent_id
+order by :_order_by
 {{ LIMIT :_limit OFFSET :_offset }}"))
