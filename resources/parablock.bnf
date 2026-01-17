@@ -36,9 +36,9 @@ function-name = #"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*"
 (* function-args 函数参数列表 *)
 function-args = function-arg (',' function-arg)*
 
-(* function-arg 函数参数，可以是列名、字面量或嵌套函数调用 *)
+(* function-arg 函数参数，可以是列名、字面量、嵌套函数调用或星号 *)
 (* 注意：不允许参数，不允许子查询 *)
-function-arg = qualified-name | literal | function-call | arithmetic-expr
+function-arg = qualified-name | literal | function-call | arithmetic-expr | '*'
 
 (* literal 字面量，包括字符串和数字 *)
 literal = string-literal | number-literal
@@ -93,4 +93,4 @@ other = (STR | ANY)
 (* 单引号字符串，支持转义引号 *)
 <SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))*'"
 (* 任意其他字符序列，不包括引号、冒号、双大括号、双中括号，但包括单独的大括号和PostgreSQL的类型转换操作符:: *)
-<ANY> = #'[^\'":{}\[]+' | #'::\w+' | #'\{(?!\{)' | #'\}(?!\})' | #'\[(?!\[)' | #'\](?!\])'
+<ANY> = #'[^\'":{}\[\]]+' | #'::\w+' | #'\{(?!\{)' | #'\}(?!\})' | #'\[(?!\[)' | #'\](?!\])'

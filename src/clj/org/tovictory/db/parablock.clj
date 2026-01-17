@@ -215,8 +215,14 @@
               alias-expr (when (> (count rest-args) 1)
                            (last rest-args))
               code (str/trim (ast->str select-expr))
-              code-last-part (last (str/split code #"."))
-              alias (if alias-expr (ast->str alias-expr) code-last-part)]
+              code-last-part (last (str/split code #"\."))  ;; 修正：使用 "\." 而不是 "."
+              alias (if alias-expr
+                      (ast->str alias-expr)
+                      ;; 如果 code 包含点号，取最后一部分作为别名
+                      ;; 否则使用 code 本身作为别名
+                      (if (.contains code ".")
+                        code-last-part
+                        code))]
           [{:code code
             :alias alias}])
 
@@ -285,6 +291,12 @@
         ;; 进入块内，所有参数都是可选的
         (mapcat #(extract-parameters % true) rest-args)
 
+        :select-list
+        ;; select-list 使用隐含的 :_cols 参数（可选）
+        [{:para_name "_cols"
+          :para_type "sql"
+          :required false}]
+
         ;; 对于 statement 或其他节点，遍历子节点
         (mapcat #(extract-parameters % in-block?) rest-args)))))
 
@@ -301,9 +313,16 @@
    注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中，否则放到params中
-   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）"
+   3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
+   4. 特定系统参数会被修正为正确的类型：_order_by -> sql"
   [ast]
   (let [all-params (mapcat #(extract-parameters % false) ast)
+        ;; 修正特定系统参数的类型
+        all-params (map (fn [param]
+                          (if (= "_order_by" (:para_name param))
+                            (assoc param :para_type "sql" :required false)
+                            param))
+                        all-params)
         params (filter #(not (.startsWith (:para_name %) "_")) all-params)
         system-params (filter #(.startsWith (:para_name %) "_") all-params)]
     {:params params
