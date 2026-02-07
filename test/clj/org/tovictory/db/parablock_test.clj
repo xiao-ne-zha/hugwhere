@@ -405,3 +405,175 @@ order by :_order_by
                 {:code "CAST ( created_date AS DATE )" :alias "create_date"}
                 {:code "CASE WHEN active = 1 THEN 'yes' ELSE 'no' END" :alias "is_active"}]
                (:result_columns metadata)))))))
+
+(deftest order-by-list-test
+  (testing "xf-statement: order-by-list 基本转换"
+    (are [params exp]
+        (= (fmt-str (sut/xf-statement params "SELECT * FROM users ORDER BY ^[id ASC, name DESC]^"))
+           exp)
+      nil "SELECT * FROM users ORDER BY id ASC, name DESC"
+      {} "SELECT * FROM users ORDER BY id ASC, name DESC"
+      {:other 1} "SELECT * FROM users ORDER BY id ASC, name DESC"))
+
+  (testing "xf-statement: order-by-list 参数覆盖"
+    (are [params exp]
+        (= (fmt-str (sut/xf-statement params "SELECT * FROM users ORDER BY ^[id ASC, name DESC]^"))
+           exp)
+      ;; 没有提供参数，使用原始内容
+      nil "SELECT * FROM users ORDER BY id ASC, name DESC"
+      ;; 提供 _order_by 参数，使用组装内容
+      {:_order_by [["created_time" "DESC"] ["id" "ASC"]]}
+      "SELECT * FROM users ORDER BY created_time DESC, id ASC"))
+
+  (testing "xf-statement: order-by-list 参数验证失败时回退"
+    (is (= "SELECT * FROM users ORDER BY id ASC, name DESC"
+           (fmt-str
+            (sut/xf-statement
+             {:_order_by [["id;DROP TABLE users--" "ASC"]]}
+             "SELECT * FROM users ORDER BY ^[id ASC, name DESC]^")))))
+
+  (testing "xf-statement: order-by-list 与其他元素组合"
+    (are [params exp]
+        (= (fmt-str
+            (sut/xf-statement
+             params
+             "SELECT ^[id ASC, name DESC]^ FROM users WHERE status = :status {{ AND name like :l:name }}"))
+           exp)
+      nil "SELECT id ASC, name DESC FROM users WHERE status = :status"
+      {:status 1} "SELECT id ASC, name DESC FROM users WHERE status = :status"
+      {:status 1 :name "test"} "SELECT id ASC, name DESC FROM users WHERE status = :status AND name like :l:name"
+      {:_order_by [["created_at" "DESC"]]}
+      "SELECT created_at DESC FROM users WHERE status = :status"))
+
+  (testing "assemble-order-by-content: 基本组装"
+    (is (= "id ASC, name DESC, created_time DESC"
+           (sut/assemble-order-by-content
+            [["id" "ASC"] ["name" "DESC"] ["created_time" "DESC"]]))))
+
+  (testing "assemble-order-by-content: 空值处理"
+    (is (nil? (sut/assemble-order-by-content nil)))
+    (is (nil? (sut/assemble-order-by-content []))))
+
+  (testing "assemble-order-by-content: 单个元素"
+    (is (= "id ASC"
+           (sut/assemble-order-by-content [["id" "ASC"]]))))
+
+  (testing "assemble-order-by-content: 复杂表达式"
+    (is (= "COUNT(*) DESC, price * quantity ASC, UPPER(name) DESC"
+           (sut/assemble-order-by-content
+            [["COUNT(*)" "DESC"]
+             ["price * quantity" "ASC"]
+             ["UPPER(name)" "DESC"]]))))
+
+  (testing "validate-order-by-content: 合法内容验证"
+    (are [content]
+        (true? (sut/validate-order-by-content content))
+      "id ASC"
+      "id ASC, name DESC"
+      "id ASC, name DESC, created_time DESC"
+      "COUNT(*) DESC, price * quantity ASC"
+      "UPPER(name) DESC, LOWER(code) ASC"))
+
+  (testing "validate-order-by-content: 非法内容验证"
+    (are [content]
+        (false? (sut/validate-order-by-content content))
+      "id"                    ; 缺少方向
+      "id ASC, name"           ; 第二个缺少方向
+      "id ASC, name DESC,"     ; 结尾多余的逗号
+      "id ASC, ; DROP TABLE users; -- DESC"  ; SQL 注入
+      "id ASC, name = 'test' DESC"           ; 包含等号
+      ""                      ; 空字符串
+      ", id ASC"              ; 开头多余逗号
+      ))
+
+  (testing "extract-order-by-items: 基本提取"
+    (let [sql "SELECT * FROM users ORDER BY ^[id ASC, name DESC]^"
+          metadata (sut/extract-sql-metadata sql)]
+      (is (= [{:code "id" :direction "ASC"}
+              {:code "name" :direction "DESC"}]
+             (:order_by_items metadata)))))
+
+  (testing "extract-order-by-items: 复杂表达式提取"
+    (let [sql "SELECT * FROM orders ORDER BY ^[COUNT(*) DESC, price * quantity ASC, UPPER(name) DESC]^"
+          metadata (sut/extract-sql-metadata sql)]
+      (is (= [{:code "COUNT ( * )" :direction "DESC"}
+              {:code "price * quantity" :direction "ASC"}
+              {:code "UPPER ( name )" :direction "DESC"}]
+             (:order_by_items metadata)))))
+
+  (testing "extract-order-by-items: 单个排序项"
+    (let [sql "SELECT * FROM users ORDER BY ^[id ASC]^"
+          metadata (sut/extract-sql-metadata sql)]
+      (is (= [{:code "id" :direction "ASC"}]
+             (:order_by_items metadata)))))
+
+  (testing "extract-order-by-items: 限定列名"
+    (let [sql "SELECT * FROM users u ORDER BY ^[u.id ASC, u.name DESC]^"
+          metadata (sut/extract-sql-metadata sql)]
+      (is (= [{:code "u.id" :direction "ASC"}
+              {:code "u.name" :direction "DESC"}]
+             (:order_by_items metadata)))))
+
+  (testing "extract-order-by-items: 没有order-by-list时返回空"
+    (let [sql "SELECT * FROM users ORDER BY id ASC"
+          metadata (sut/extract-sql-metadata sql)]
+      (is (empty? (:order_by_items metadata)))))
+
+  (testing "extract-sql-metadata: 包含 order-by-list 的完整元数据"
+    (let [sql "SELECT ^[id ASC, name DESC]^
+FROM users
+WHERE status = :status
+{{ AND name like :l:name }}
+ORDER BY ^[created_time DESC, id ASC]^"
+          metadata (sut/extract-sql-metadata sql)]
+      ;; 测试普通参数
+      (is (= [{:para_name "status" :para_type "v" :required true}
+              {:para_name "name" :para_type "l" :required false}]
+             (:params metadata)))
+      ;; 测试系统参数（两个 _order_by 参数）
+      (is (= 2 (count (filter #(= "_order_by" (:para_name %))
+                             (:system_params metadata)))))
+      ;; 测试排序项
+      (is (= [{:code "id" :direction "ASC"}
+              {:code "name" :direction "DESC"}
+              {:code "created_time" :direction "DESC"}
+              {:code "id" :direction "ASC"}]
+             (:order_by_items metadata)))))
+
+  (testing "xf-statement: select-list 和 order-by-list 同时存在"
+    (let [sql "SELECT [[id, name, created_at]]
+FROM users
+WHERE status = :status
+ORDER BY ^[created_at DESC, id ASC]^"
+          params {:_cols [["user_id" "id"] ["user_name" "name"]]
+                  :_order_by [["updated_at" "DESC"]]}
+          result (sut/xf-statement params sql)]
+      ;; select-list 被替换（包含 AS 关键字）
+      (is (str/includes? result "user_id AS id, user_name AS name"))
+      ;; order-by-list 被替换
+      (is (str/includes? result "updated_at DESC"))))
+
+  (testing "xf-statement: 多个 order-by-list"
+    (let [sql "SELECT ^[priority DESC]^
+FROM tasks
+WHERE status = :status
+ORDER BY ^[created_at DESC, id ASC]^"
+          params {:_order_by [["updated_at" "DESC"]]}
+          result (sut/xf-statement params sql)]
+      ;; 两个 order-by-list 都应该被替换
+      (is (= 2 (count (re-seq #"updated_at DESC" result))))))
+
+  (testing "xf-statement: order-by-list 与 block 组合"
+    (are [params exp]
+        (= (fmt-str
+            (sut/xf-statement
+             params
+             "SELECT * FROM users WHERE 1 = 1 {{ AND status = :status }} ORDER BY ^[id ASC]^"))
+           exp)
+      nil "SELECT * FROM users WHERE 1 = 1 ORDER BY id ASC"
+      {:status 1} "SELECT * FROM users WHERE 1 = 1 AND status = :status ORDER BY id ASC"
+      {:_order_by [["name" "DESC"]]}
+      "SELECT * FROM users WHERE 1 = 1 ORDER BY name DESC"
+      {:status 1 :_order_by [["name" "DESC"]]}
+      "SELECT * FROM users WHERE 1 = 1 AND status = :status ORDER BY name DESC")))
+

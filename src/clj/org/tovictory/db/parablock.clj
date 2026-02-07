@@ -114,9 +114,19 @@
     ast
     (if (vector? ast)
       (let [[tp & rest] ast]
-        (if (= :select-list tp)
-          ;; 对于select-list，递归处理其内容
+        (cond
+          (= tp :order-by-content)
+          ;; 对于order-by-content，过滤逗号后重新用", "连接
+          (->> rest
+               (map ast->str)
+               (filter #(not (= "," %)))
+               (str/join ", "))
+
+          (#{:select-list :order-by-list} tp)
+          ;; 对于select-list和order-by-list，递归处理其内容
           (->> rest (map ast->str) (str/join \space))
+
+          :else
           ;; 其他节点，拼接所有子节点
           (->> rest (map ast->str) (str/join \space))))
       (str ast))))
@@ -136,6 +146,45 @@
       (not (insta/failure? result)))
     (catch Exception _
       false)))
+
+(defn validate-order-by-content
+  "验证order-by-content是否合法，防止SQL注入。
+
+   使用order-by-list语法规则解析order-by-content，
+   如果解析失败则说明内容不合法或包含注入攻击。
+
+   order-by-content - ORDER BY列表内容字符串
+   返回: 合法时返回true，非法时返回false"
+  [order-by-content]
+  (try
+    (let [wrapped (str "^[" order-by-content "]^")
+          result (parser wrapped)]
+      (not (insta/failure? result)))
+    (catch Exception _
+      false)))
+
+(defn assemble-order-by-content
+  "从:_order_by参数组装order-by-content字符串。
+
+   :_order_by参数格式：[[code-or-expr direction] ...]
+   其中：
+   - code-or-expr: 排序表达式（列名、函数调用等）
+   - direction: 排序方向，必须为 ASC 或 DESC
+
+   参数说明：
+   order-cols - :_order_by参数的值，格式为 [[expr direction] ...]
+
+   返回: 组装后的order-by-content字符串
+
+   示例：
+   (assemble-order-by-content [[\"id\" \"ASC\"] [\"name\" \"DESC\"] [\"create_time\" \"DESC\"]])
+   => \"id ASC, name DESC, create_time DESC\""
+  [order-cols]
+  (when (and (coll? order-cols) (seq order-cols))
+    (let [items (map (fn [[col-expr direction]]
+                       (str col-expr \space direction))
+                     order-cols)]
+      (str/join ", " items))))
 
 (defn assemble-select-content
   "从:_cols参数组装select-content字符串。
@@ -161,6 +210,35 @@
                          (str col-code " AS " alias)))
                      cols)]
       (str/join ", " items))))
+
+(defn xf-order-by-list
+  "处理order-by-list块，根据:_order_by参数决定如何处理。
+
+   处理逻辑：
+   1. 当params中未提供:_order_by参数时，使用order-by-content原始内容
+   2. 当params中提供:_order_by参数时：
+      - 使用:_order_by值组装order-by-content
+      - 验证组装后的内容是否合法（防止SQL注入）
+      - 如果合法则使用组装的内容，否则使用原始内容
+
+   ast - order-by-list的AST节点，格式为 [:order-by-list order-by-content]
+   params - 参数map
+   options - 配置选项（未使用，保留以保持接口一致性）
+
+   返回: 转换后的ORDER BY列表字符串"
+  [[_ content-ast] params _]
+  (let [original-content (ast->str content-ast)
+        order-by-param (get params :_order_by)]
+    (if (nil? order-by-param)
+      ;; 未提供:_order_by参数，使用原始内容
+      original-content
+      ;; 提供:_order_by参数，尝试组装并验证
+      (let [assembled-content (assemble-order-by-content order-by-param)]
+        (if (and assembled-content (validate-order-by-content assembled-content))
+          ;; 验证通过，使用组装的内容
+          assembled-content
+          ;; 验证失败，使用原始内容
+          original-content)))))
 
 (defn xf-select-list
   "处理select-list块，根据:_cols参数决定如何处理。
@@ -190,6 +268,44 @@
           assembled-content
           ;; 验证失败，使用原始内容
           original-content)))))
+
+(defn- extract-order-by-items
+  "从order-by-list的AST中提取排序项信息。
+
+   递归遍历order-by-list的AST，提取每个排序项的code和direction信息。
+
+   ast-node - order-by-list的AST节点
+   返回: 排序项信息map的向量，格式如下：
+         [{:code \"column_expr\" :direction \"ASC/DESC\"} ...]"
+  [ast-node]
+  (when (vector? ast-node)
+    (let [[tp & rest-args] ast-node]
+      (case tp
+        :order-by-list
+        ;; 进入order-by-list，提取其内容中的排序项信息
+        (mapcat extract-order-by-items rest-args)
+
+        :order-item
+        ;; order-item: select-expr (DESC | ASC)
+        ;; rest-args格式：[select-expr direction]
+        (let [select-expr (first rest-args)
+              direction-expr (second rest-args)
+              code (str/trim (ast->str select-expr))
+              direction (when direction-expr
+                         (ast->str direction-expr))]
+          [{:code code
+            :direction direction}])
+
+        :order-by-content
+        ;; order-by-content节点，遍历子节点
+        (mapcat extract-order-by-items rest-args)
+
+        :select-expr
+        ;; select-expr节点，不需要处理，由order-item处理
+        []
+
+        ;; 其他节点，遍历子节点
+        (mapcat extract-order-by-items rest-args)))))
 
 (defn- extract-select-columns
   "从select-list的AST中提取列信息。
@@ -248,6 +364,7 @@
      :parameter - 参数节点，不在块内时不传参数map
      :block - 块节点，需要传递参数map
      :select-list - select-list节点，根据:_cols参数决定如何处理
+     :order-by-list - order-by-list节点，根据:_order_by参数决定如何处理
      其他 - 直接返回节点内容
 
    返回: 转换后的SQL片段字符串"
@@ -258,6 +375,7 @@
      :parameter (xf-parameter ast)
      :block (xf-block ast params options)
      :select-list (xf-select-list ast params options)
+     :order-by-list (xf-order-by-list ast params options)
      (second ast))))
 
 (defn- extract-parameters
@@ -297,6 +415,12 @@
           :para_type "sql"
           :required false}]
 
+        :order-by-list
+        ;; order-by-list 使用隐含的 :_order_by 参数（可选）
+        [{:para_name "_order_by"
+          :para_type "sql"
+          :required false}]
+
         ;; 对于 statement 或其他节点，遍历子节点
         (mapcat #(extract-parameters % in-block?) rest-args)))))
 
@@ -314,7 +438,10 @@
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中，否则放到params中
    3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
-   4. 特定系统参数会被修正为正确的类型：_order_by -> sql"
+   4. 特定系统参数会被修正为正确的类型：_order_by -> sql
+      _order_by 参数可能来自：
+      - order-by-list 语法（^[expr ASC, expr DESC]^）
+      - 直接在 SQL 中使用 order by :_order_by（easysql 模式）"
   [ast]
   (let [all-params (mapcat #(extract-parameters % false) ast)
         ;; 修正特定系统参数的类型
@@ -329,10 +456,10 @@
      :system_params system-params}))
 
 (defn extract-sql-metadata
-  "提取SQL的元数据信息，包括参数信息和结果列信息。
+  "提取SQL的元数据信息，包括参数信息、结果列信息和排序项信息。
 
-   这是一个组合函数，整合了 extract-named-parameters
-   和 extract-select-columns 的结果。
+   这是一个组合函数，整合了 extract-named-parameters、
+   extract-select-columns 和 extract-order-by-items 的结果。
 
    参数说明：
    sql - 完整的SQL字符串
@@ -340,13 +467,15 @@
    返回格式：
    {:params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
     :system_params [{:para_name \"para_name\" :para_type \"para_type\" :required true/false}]
-    :result_columns [{:code \"column_expr\" :alias \"column_alias\"}]}
+    :result_columns [{:code \"column_expr\" :alias \"column_alias\"}]
+    :order_by_items [{:code \"column_expr\" :direction \"ASC/DESC\"}]}
 
    注意事项：
    1. 当para_type没有值时，取默认值 \"v\"
    2. 当para_name以`_`开头时，放到system_params中
    3. 在{{}}块内的参数为可选参数（required=false），不在其中的为必选参数（required=true）
-   4. result_columns从select-list块中提取，直接使用extract-select-columns的返回格式"
+   4. result_columns从select-list块中提取，直接使用extract-select-columns的返回格式
+   5. order_by_items从order-by-list块中提取，直接使用extract-order-by-items的返回格式"
   [sql]
   (let [result (parser sql)]
     (if (insta/failure? result)
@@ -357,8 +486,14 @@
             select-list-cols (->> result
                                   (mapcat extract-select-columns)
                                   (filter :code)
-                                  vec)]
-        (assoc named-params :result_columns select-list-cols)))))
+                                  vec)
+            order-by-items (->> result
+                                (mapcat extract-order-by-items)
+                                (filter :code)
+                                vec)]
+        (-> named-params
+            (assoc :result_columns select-list-cols)
+            (assoc :order_by_items order-by-items))))))
 
 (defn xf-statement
   "将SQL模板语句转换为最终SQL语句。

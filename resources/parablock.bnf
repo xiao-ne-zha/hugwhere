@@ -1,5 +1,5 @@
 (* 该语言的一个语句为任意多个参数(parameter)、块(block)、选择列表(select-list)和其他元素(other)的组合 *)
-statement = (other | parameter | block | select-list)+
+statement = (other | parameter | block | select-list | order-by-list)+
 (* block 是由 `{{}}`包围的 任意多个参数(parameter)、块(block)和其他元素(other)的组合 *)
 block = <'{{'> (other | parameter | block)+ <'}}'>
 
@@ -7,6 +7,18 @@ block = <'{{'> (other | parameter | block)+ <'}}'>
 (* 注意：select-list 内部不允许参数，以防止SQL注入 *)
 (* 内容必须是合法的 SQL SELECT 列表表达式，支持列名、函数调用、别名等 *)
 select-list = <'[['> select-content <']]'>
+
+(* order-by-list 是由 `^[` `]^`包围的 ORDER BY 列表，用于动态排序 *)
+(* 注意：order-by-list 内部不允许参数，以防止SQL注入 *)
+(* 内容必须是合法的 SQL ORDER BY 表达式，至少包含一个排序元素 *)
+(* 每个排序元素必须带 DESC 或 ASC 指明排序方向 *)
+order-by-list = <'^['> order-by-content <']^'>
+
+(* order-by-content 是 ORDER BY 列表的内容，由一个或多个 order-item 组成，用逗号分隔 *)
+order-by-content = order-item (',' order-item)*
+
+(* order-item 是 ORDER BY 列表中的一个排序项，必须带排序方向 *)
+order-item = select-expr ('DESC' | 'ASC')
 
 (* select-content 是 SELECT 列表的内容，由一个或多个 select-item 组成，用逗号分隔 *)
 select-content = select-item (',' select-item)*
@@ -93,4 +105,4 @@ other = (STR | ANY)
 (* 单引号字符串，支持转义引号 *)
 <SQUOTA_STR> = #"'([^']|((?<=\\)')|(''))*'"
 (* 任意其他字符序列，不包括引号、冒号、双大括号、双中括号，但包括单独的大括号和PostgreSQL的类型转换操作符:: *)
-<ANY> = #'[^\'":{}\[\]]+' | #'::\w+' | #'\{(?!\{)' | #'\}(?!\})' | #'\[(?!\[)' | #'\](?!\])'
+<ANY> = #'[^\'":{}\[\]\^]+' | #'::\w+' | #'\{(?!\{)' | #'\}(?!\})' | #'\[(?!\[)' | #'\](?!\])' | #'\^(?!\[)' | #'\](?!\^)'
